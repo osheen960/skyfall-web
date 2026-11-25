@@ -409,14 +409,41 @@ function typeUplink(el, text) {
   const step = () => { if (el.dataset.tid !== id || !el.isConnected) return; n = Math.min(text.length, n + 1); render(n); if (n < text.length) setTimeout(step, 14); };
   setTimeout(step, 250);
 }
+/* Animated calculation: counter starts at 100, each deduction (biggest first) lands in turn with its bar filling
+   while the counter and meter tick down, finishing on the score and grade. */
 function breakdown(t) {
-  const ac = AC(), rows = t.deductions.slice().sort((a, b) => b.points - a.points).map(d => { const hot = d.points >= 15;
-    return `<div class="ded"><span class="k" style="color:${hot ? AMBER : INK}">${d.label}</span><div class="mid"><div class="m dim" style="font-size:9px">${esc(d.detail)}</div><div class="dbar"><i style="width:${Math.max(2, Math.min(100, d.points / 80 * 100))}%;background:${hot ? AMBER : ac};transform-origin:left;animation:growx .8s both"></i></div></div><span class="dv" style="color:${hot ? AMBER : INK}">−${d.points}</span></div>`; }).join('');
-  return panel(`How ${t.score} is calculated`, 'G-02', `<div class="ded" style="height:26px"><span class="k ink">START</span><span class="mid m faint" style="font-size:9px">perfect conditions</span><span class="dv good">100</span></div>
+  const ac = AC(), ds = t.deductions.slice().sort((a, b) => b.points - a.points);
+  const rows = ds.map((d, i) => { const hot = d.points >= 15;
+    return `<div class="ded calc-row" data-step="${i}" data-pts="${d.points}" style="opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s"><span class="k" style="color:${hot ? AMBER : INK}">${d.label}</span><div class="mid"><div class="m dim" style="font-size:9px">${esc(d.detail)}</div><div class="dbar"><i style="width:0;transition:width .75s cubic-bezier(.4,0,.2,1);background:${hot ? AMBER : ac}" data-w="${Math.max(2, Math.min(100, d.points / 80 * 100))}"></i></div></div><span class="dv" style="color:${hot ? AMBER : INK}">−${d.points}</span></div>`; }).join('');
+  return panel(`How ${t.score} is calculated // ${hm(t.tee)} tee`, 'G-02', `<div id="calc" data-score="${t.score}" data-grade="${Golf.grade(t.score)}">
+    <div style="display:flex;align-items:flex-end"><span class="d calc-n" style="font-weight:300;font-size:56px;line-height:1">100</span><span class="m dim" style="font-size:12px;margin:0 0 10px 4px">/100</span><span style="flex:1"></span><span class="m calc-g faint" style="font-size:12px;letter-spacing:2px;margin-bottom:10px">CALCULATING…</span></div>
+    <div style="position:relative;height:10px;background:color-mix(in srgb,var(--ac) 8%,transparent);margin:6px 0 12px"><i class="calc-m" style="position:absolute;left:0;top:0;bottom:0;width:100%"></i><span style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(0,0,0,.5) 0 10%)"></span></div>
+    <div class="ded" style="height:26px"><span class="k ink">START</span><span class="mid m faint" style="font-size:9px">perfect conditions</span><span class="dv good">100</span></div>
     ${rows || '<div class="m dim" style="font-size:10px">NO DEDUCTIONS. SUSPICIOUS.</div>'}
-    <div style="height:1px;background:${rgba(ac, .3)};margin:6px 0"></div>
-    <div class="ded"><span class="k ac">SCORE</span><span class="mid m dim" style="font-size:9px">grade ${Golf.grade(t.score)}</span><span class="dv" style="font-size:20px;color:${scoreColor(t.score)}">${t.score}</span></div>
-    <div class="tiny" style="margin-top:8px">GRADES · A 85+ · B 70+ · C 55+ · D 40+ · F BELOW</div>`, { key: 'gbreak', i: 1 });
+    <div class="calc-end" style="opacity:0;transition:opacity .4s"><div style="height:1px;background:${rgba(ac, .3)};margin:6px 0"></div>
+      <div class="ded"><span class="k ac">SCORE</span><span class="mid m dim" style="font-size:9px">main limiter: ${t.limiter.toLowerCase()}</span><span class="dv" style="font-size:20px;color:${scoreColor(t.score)}">${t.score}</span></div></div>
+    <div style="display:flex;align-items:center;margin-top:8px"><span class="tiny" style="flex:1">GRADES · A 85+ · B 70+ · C 55+ · D 40+ · F BELOW</span><button class="m ac calc-replay" style="font-size:10px;padding:8px 6px">[REPLAY]</button></div></div>`, { key: 'gbreak', i: 0 });
+}
+function runCalc(root) {
+  if (!root) return;
+  const id = String(Math.random()); root.dataset.run = id;
+  const n = root.querySelector('.calc-n'), m = root.querySelector('.calc-m'), g = root.querySelector('.calc-g'), end = root.querySelector('.calc-end');
+  const rows = [...root.querySelectorAll('.calc-row')], score = +root.dataset.score;
+  const show = v => { const r = Math.round(v); n.textContent = r; n.style.color = scoreColor(r); m.style.width = v + '%'; m.style.background = scoreColor(r); };
+  rows.forEach(r => { r.style.opacity = 0; r.style.transform = 'translateY(8px)'; r.querySelector('i').style.width = 0; });
+  end.style.opacity = 0; g.textContent = 'CALCULATING…'; g.style.color = 'var(--faint)'; show(100);
+  const finish = () => { show(score); end.style.opacity = 1; g.textContent = 'GRADE ' + root.dataset.grade; g.style.color = scoreColor(score); };
+  if (reduce) { rows.forEach(r => { r.style.opacity = 1; r.style.transform = 'none'; r.querySelector('i').style.width = r.querySelector('i').dataset.w + '%'; }); finish(); return; }
+  let acc = 100, k = 0;
+  const tween = (from, to, ms, done) => { const t0 = performance.now(); const f = now => { if (root.dataset.run !== id) return; const p = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - p, 3); show(from + (to - from) * e); p < 1 ? requestAnimationFrame(f) : done(); }; requestAnimationFrame(f); };
+  const next = () => {
+    if (root.dataset.run !== id || !root.isConnected) return;
+    if (k >= rows.length) { finish(); return; }
+    const r = rows[k++], pts = +r.dataset.pts, from = acc; acc = Math.max(0, acc - pts);
+    r.style.opacity = 1; r.style.transform = 'none'; const bar = r.querySelector('i'); requestAnimationFrame(() => (bar.style.width = bar.dataset.w + '%'));
+    tween(from, acc, 750, () => setTimeout(next, 300));
+  };
+  setTimeout(next, 500);
 }
 function flight(t) {
   const ac = AC(), temp = isNaN(t.tMin) ? NaN : (t.tMin + t.tMax) / 2, rows = Flight.table(t.wind, temp), gusts = Flight.table(t.gust, temp);
@@ -466,12 +493,13 @@ function renderGolf() {
   const none = panel('No window', null, '<div class="m dim" style="font-size:11px">NO PLAYABLE DAYLIGHT WINDOW IN FORECAST RANGE</div>', { key: 'nowin', i: 0 });
   let body = '', up = null;
   if (S.golfTab === 'BRIEF') { up = uplink(g.date, slot, g); body = up.html + scoreSummary(g.date, slot, g, 1); }
-  else if (S.golfTab === 'SCORE') body = scoreSummary(g.date, slot, g, 0) + (slot ? breakdown(slot) : '');
+  else if (S.golfTab === 'SCORE') body = slot ? breakdown(slot) : none;
   else if (S.golfTab === 'FLIGHT') body = slot ? flight(slot) : none;
   else body = teeSheet(g, slot);
   el.innerHTML = `<div class="col" style="gap:10px">${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
   mountPanels(el);
   if (up) typeUplink($('#uplink'), up.text);
+  if (S.golfTab === 'SCORE') runCalc($('#calc'));
 }
 
 /* ---------- AIR ---------- */
@@ -639,6 +667,7 @@ document.body.addEventListener('click', e => {
     if (!GOOGLE_KEY.test(k)) { S.pollenError = "That isn't a Google API key (they start with AIza)."; renderAir(); return; }
     S.pollenKey = k; S.pollenError = null; Store.set('pollenKey', k); Store.del(`snap:pollen:${placeKey(S.place.lat, S.place.lon)}`); renderAir(); refresh(false); return;
   }
+  if (t.closest('.calc-replay')) { runCalc($('#calc')); return; }
   if (t.id === 'keyClear') { S.pollenKey = ''; S.pollen = null; Store.del('pollenKey'); renderAll(); }
 });
 
