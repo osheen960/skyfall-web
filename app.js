@@ -561,13 +561,18 @@ function applyTheme() {
   const d = w.daily[0], rise = hourOf(d.sunrise) * 60 + new Date(d.sunrise).getUTCMinutes(), set = hourOf(d.sunset) * 60 + new Date(d.sunset).getUTCMinutes();
   const sky = Codes.sky(w.current.code);
   document.documentElement.style.setProperty('--ac', themeAccent(minute, rise, set, w.current.temperature, sky));
-  Scene.set({ sky, minute, rise, set, wind: w.current.windSpeed, moon: moonPhase(Date.now()) });
+  // Same input as Android's SceneInput.fromLocal: the current hour's code drives the scene.
+  const hourStart = localNow(w.off) - localNow(w.off) % HOUR, hr = w.hourly.find(h => h.time >= hourStart) || w.hourly[0];
+  const code = hr ? hr.code : w.current.code;
+  const intensity = ({ 51: .25, 56: .25, 53: .35, 55: .45, 57: .45, 61: .5, 66: .5, 63: .8, 65: 1, 67: 1, 80: .6, 81: .85, 82: 1, 71: .5, 73: .75, 75: 1, 77: .4, 85: .6, 86: 1, 95: 1, 96: 1, 99: 1 })[code] || 0;
+  Scene.set({ sky: Codes.sky(code), intensity, minute: minute + n.getUTCSeconds() / 60, rise, set, wind: hr ? hr.wind : w.current.windSpeed, windFrom: hr ? hr.dir : w.current.windDirection,
+    cloudCover: w.current.cloudCover || 0, moon: moonPhase(Date.now()), southern: w.lat < 0 });
   $('#ambTemp').textContent = deg(w.current.temperature);
   $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + '';
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
 }
 /* The sky scene only lives behind CORE, fading as you swipe away (Android "coreness"). */
-function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; }
+function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; $('#scrim').style.opacity = f; }
 function renderAll() { renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
 
 /* ---------- data flow ---------- */
