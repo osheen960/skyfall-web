@@ -97,7 +97,7 @@ function icon(code, day = true, size = 18, tint) {
   }
   return `<svg class="ico" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
 }
-const windArrow = (from, col = INK, size = 12) => `<span class="wa" style="width:${size}px;height:${size}px;transform:rotate(${from + 180}deg)"><svg viewBox="-6 -6 12 12" style="animation-delay:-${(from % 7) * .3}s"><path d="M0 6V-6M0-6l-3.6 1.8M0-6l3.6 1.8" stroke="${col}" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></span>`;
+const windArrow = (from, col = INK, size = 12) => `<span class="wa" style="width:${size}px;height:${size}px;transform:rotate(${from + 180}deg)"><svg viewBox="-6 -6 12 12" style="animation-delay:-${(from % 7) * .3}s"><path d="M0 6V-6M0-6l-3.6 1.8M0-6l3.6 1.8" style="stroke:${col}" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></span>`;
 
 /* ---------- gear glyphs (Android GearIcon paths, 24-unit box) ---------- */
 const GEAR = {
@@ -143,7 +143,7 @@ function loadout(w, isToday) {
   const title = !isToday ? `Loadout // ${DOW[dow(T(dkey(w.current.time) + 'T00:00'))].charAt(0) + DOW[dow(T(dkey(w.current.time) + 'T00:00'))].slice(1).toLowerCase()} daylight` : lo.next ? 'Loadout // tomorrow, daylight' : 'Loadout // daylight hours';
   const cells = Gear.map(([g, name]) => {
     const a = items[g];
-    if (!a) return `<div class="gc" style="border-color:rgba(230,251,255,.06)"><svg viewBox="0 0 24 24" width="22" height="22" stroke="rgba(230,251,255,.2)" stroke-width="1.4"><path d="${GEAR[g]}"/></svg><div class="n" style="color:rgba(230,251,255,.3)">${esc(name.toUpperCase())}</div><div class="x">NOT NEEDED</div></div>`;
+    if (!a) return `<div class="gc" style="border-color:rgba(var(--inkrgb),.06)"><svg viewBox="0 0 24 24" width="22" height="22" style="stroke:rgba(var(--inkrgb),.2)" stroke-width="1.4"><path d="${GEAR[g]}"/></svg><div class="n" style="color:rgba(var(--inkrgb),.3)">${esc(name.toUpperCase())}</div><div class="x">NOT NEEDED</div></div>`;
     const hot = a.pri >= 8, col = hot ? AMBER : ac;
     // One quip per item per day, written from that day's numbers (same pick as Android).
     const ord = { SHELL: 1, COAT: 2, LAYERS: 3, TSHIRT: 4, BOOTS: 5, SANDALS: 6, SNEAKERS: 7, SUNGLASSES: 8, SUNSCREEN: 9, HAT: 10, MASK: 11, GLOVES: 14 }[g] || 0;
@@ -469,7 +469,7 @@ function flight(t) {
       <div class="m" style="font-size:9px;letter-spacing:1px;margin-top:8px;color:${t.gust >= 40 ? AMBER : 'var(--dim)'}">GUSTS ${R(t.gust)} KM/H: DRIVER INTO ${gusts[0].into} M · DRIFT ±${gusts[0].drift} M</div>
       <div class="tiny" style="margin-top:6px">BASELINE = MID-HANDICAP CALM-AIR CARRY AT 21°C. RULES OF THUMB: −1%/MPH INTO, +0.5%/MPH DOWN, 0.5%/MPH CROSS DRIFT.</div>`, { key: 'gcarry', i: 1 })
     + panel(lefty ? 'Lefty notes' : 'Righty notes', 'G-06', `<div class="hand"><span class="rl" style="flex:1">PLAYER</span><button data-hand="L" aria-pressed="${lefty}">LEFT-HANDED</button><button data-hand="R" aria-pressed="${!lefty}">RIGHT-HANDED</button></div>
-      <div class="m" style="font-size:9px;line-height:14px;letter-spacing:.5px;color:rgba(230,251,255,.85)">${esc(notes)}</div>`, { key: 'gnotes', i: 2 });
+      <div class="m" style="font-size:9px;line-height:14px;letter-spacing:.5px;color:rgba(var(--inkrgb),.85)">${esc(notes)}</div>`, { key: 'gnotes', i: 2 });
 }
 function teeSheet(g, slot) {
   const ac = AC();
@@ -479,7 +479,7 @@ function teeSheet(g, slot) {
       <span class="m" style="width:44px;font-size:12px;color:${on || best ? ac : INK}">${hm(t.tee)}</span>
       <span style="flex:1;position:relative;display:flex;align-items:center"><span class="sbar" style="flex:1"><i style="width:${t.score}%;background:${scoreColor(t.score)}"></i></span><span class="d" style="position:absolute;right:0;font-weight:600;font-size:15px;color:${scoreColor(t.score)}">${t.score}${best ? '◆' : ''}</span></span>
       <span class="mono11" style="width:42px;padding-left:6px;color:${t.pop >= 40 ? ac : 'var(--dim)'}">${t.pop}%</span>
-      <span style="width:50px;display:flex;align-items:center;gap:3px">${windArrow(t.dir, 'rgba(230,251,255,.58)', 10)}<span class="mono11" style="color:${t.gust >= 40 ? AMBER : 'var(--dim)'}">${R(t.wind)}</span></span>
+      <span style="width:50px;display:flex;align-items:center;gap:3px">${windArrow(t.dir, 'rgba(var(--inkrgb),.58)', 10)}<span class="mono11" style="color:${t.gust >= 40 ? AMBER : 'var(--dim)'}">${R(t.wind)}</span></span>
       <span class="m faint" style="width:42px;font-size:9px">${t.limiter === 'NONE' ? '—' : t.limiter.slice(0, 4)}</span></button>`; }).join('');
   return panel('Tee sheet // golf score', 'G-04', `<div class="tiny" style="margin-bottom:8px">TAP A TEE TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A 4H ROUND</div>
     <div class="th" style="padding-bottom:4px"><span style="width:48px;font-size:8px">TEE</span><span style="flex:1;font-size:8px">SCORE /100</span><span style="width:42px;font-size:8px">RAIN</span><span style="width:50px;font-size:8px">WIND</span><span style="width:42px;font-size:8px">LIMIT</span></div>${rows}`, { key: 'gsheet', i: 0 });

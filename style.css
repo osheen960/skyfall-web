@@ -5,7 +5,7 @@ PICTURE: the living sky behind CORE; the reactor core gauge.
 COLOUR and TYPE: void black, ice ink, one accent drifting with time of day and temperature; Rajdhani + Share Tech Mono.
 LAYOUT: Android metrics 1:1 (1dp = 1px) - 14px page gutters, 12px between panels, 54px dock.
 */
-:root{--void:#020409;--ink:#e6fbff;--dim:rgba(230,251,255,.58);--faint:rgba(230,251,255,.32);--ac:#00e5ff;--amber:#ffb547;--alert:#ff4d6a;--good:#3dff9a;color-scheme:dark}
+:root{--inkrgb:230,251,255;--void:#020409;--ink:#e6fbff;--dim:rgba(var(--inkrgb),.58);--faint:rgba(var(--inkrgb),.32);--ac:#00e5ff;--amber:#ffb547;--alert:#ff4d6a;--good:#3dff9a;color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%}
 body{margin:0;background:var(--void);color:var(--ink);font:500 16px/1.3 Rajdhani,system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -17,7 +17,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-off
 .up{text-transform:uppercase}
 
 /* ---- light mode (matches Android Mode.light) ---- */
-body.light{--void:#eef3f7;--ink:#0b1a28;--dim:rgba(11,26,40,.66);--faint:rgba(11,26,40,.4);--amber:#8f5f14;--alert:#8f1c2c;--good:#158f4f;color-scheme:light}
+body.light{--inkrgb:11,26,40;--void:#eef3f7;--ink:#0b1a28;--dim:rgba(11,26,40,.66);--faint:rgba(11,26,40,.4);--amber:#8f5f14;--alert:#8f1c2c;--good:#158f4f;color-scheme:light}
 body.light #scrim{background:linear-gradient(rgba(255,255,255,.72),rgba(255,255,255,.55),rgba(255,255,255,.85))}
 body.light #boot{background:rgba(238,243,247,.96)}
 body.light #toast{background:color-mix(in srgb,var(--alert) 10%,#eef3f7)}
@@ -25,7 +25,7 @@ body.light #dock{background:rgba(238,243,247,.88)}
 body.light .panel>svg.frame .fill{fill:rgba(255,255,255,.62)}
 body.light .chip,body.light .tee{background:rgba(255,255,255,.25)}
 body.light .overlay{background:rgba(238,243,247,.95)}
-body.light .ambient{background:transparent;--ink:#e6fbff;--dim:rgba(230,251,255,.58)}
+body.light .ambient{background:transparent;--inkrgb:230,251,255;--ink:#e6fbff;--dim:rgba(var(--inkrgb),.58)}
 .sq svg .solid{fill:var(--ac);stroke:none}
 #btnMode svg{transition:transform .5s}
 body.light #btnMode svg{transform:rotate(180deg)}
@@ -147,14 +147,14 @@ h1{margin:0;font:600 26px/1.15 Rajdhani,sans-serif;white-space:nowrap;overflow:h
 .gc .n{font:9px 'Share Tech Mono',monospace;letter-spacing:1px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .gc .r{font:8px/10px 'Share Tech Mono',monospace;letter-spacing:.5px;color:var(--dim)}
 .gc .q{font:italic 8px/10px 'Share Tech Mono',monospace;letter-spacing:.3px;margin-top:3px}
-.gc .x{font:7px 'Share Tech Mono',monospace;letter-spacing:1px;color:rgba(230,251,255,.22)}
+.gc .x{font:7px 'Share Tech Mono',monospace;letter-spacing:1px;color:rgba(var(--inkrgb),.22)}
 
 /* ---- comms ---- */
 .tx{display:flex;padding:5px 0}
 .tx .st{width:66px;flex:none;font:9px/1.4 'Share Tech Mono',monospace;color:var(--faint)}
 .tx .tg{display:block;letter-spacing:1px;color:var(--ac)}
 .tx.serious .tg{color:var(--alert)}
-.tx .b{flex:1;font:11px/15px 'Share Tech Mono',monospace;letter-spacing:.4px;color:rgba(230,251,255,.88)}
+.tx .b{flex:1;font:11px/15px 'Share Tech Mono',monospace;letter-spacing:.4px;color:rgba(var(--inkrgb),.88)}
 .tx.serious .b{color:var(--ink)}
 .caret{color:var(--ink);animation:cblink .7s steps(1) infinite}
 @keyframes cblink{50%{color:transparent}}
@@ -200,7 +200,7 @@ h1{margin:0;font:600 26px/1.15 Rajdhani,sans-serif;white-space:nowrap;overflow:h
 .dbar{height:3px;margin-top:1px;background:color-mix(in srgb,var(--ac) 8%,transparent)}
 .dbar i{display:block;height:100%}
 .hand{display:flex;align-items:center;gap:6px;margin-bottom:10px}
-.hand button{padding:8px 10px;border:1px solid rgba(230,251,255,.13);font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:var(--dim);min-height:36px}
+.hand button{padding:8px 10px;border:1px solid rgba(var(--inkrgb),.13);font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:var(--dim);min-height:36px}
 .hand button[aria-pressed=true]{border-color:var(--ac);color:var(--ac)}
 .ctab .r{display:flex;align-items:center;height:28px}
 .ctab .r>*:nth-child(1){flex:1.4}.ctab .r>*:nth-child(2),.ctab .r>*:nth-child(3),.ctab .r>*:nth-child(4){flex:1}.ctab .r>*:nth-child(5){flex:1.1}
@@ -227,9 +227,9 @@ h1{margin:0;font:600 26px/1.15 Rajdhani,sans-serif;white-space:nowrap;overflow:h
 .sheet-head{display:flex;justify-content:space-between;align-items:center;font:11px 'Share Tech Mono',monospace;letter-spacing:2px;color:var(--ac)}
 button.txt{font:12px 'Share Tech Mono',monospace;letter-spacing:1px;color:var(--ac);padding:8px 4px;min-height:40px}
 #q{width:100%;font:500 26px Rajdhani,sans-serif;color:var(--ink);background:transparent;border:0;border-bottom:1px solid color-mix(in srgb,var(--ac) 50%,transparent);padding:8px 0;border-radius:0}
-#q::placeholder{color:rgba(230,251,255,.3)}
+#q::placeholder{color:rgba(var(--inkrgb),.3)}
 button.wide{width:100%;padding:12px 14px;border:1px solid color-mix(in srgb,var(--ac) 60%,transparent);background:color-mix(in srgb,var(--ac) 8%,transparent);color:var(--ac);font:11px 'Share Tech Mono',monospace;letter-spacing:2px;text-align:left;min-height:44px}
-#results button{display:block;width:100%;padding:12px 0;border-bottom:1px solid rgba(230,251,255,.07)}
+#results button{display:block;width:100%;padding:12px 0;border-bottom:1px solid rgba(var(--inkrgb),.07)}
 #results b{font:600 20px Rajdhani,sans-serif}
 #results span{display:block;font:10px 'Share Tech Mono',monospace;letter-spacing:1px;color:var(--dim)}
 .ambient{background:transparent;align-items:flex-end;justify-content:flex-start;padding:24px 24px calc(env(safe-area-inset-bottom) + 28px)}
