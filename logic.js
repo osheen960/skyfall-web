@@ -7,12 +7,13 @@ const Store = {
   del(k) { try { localStorage.removeItem('sf:' + k); } catch { } },
 };
 
-/** Station readings need a CORS-enabled source; METAR and BoM refuse browser requests, so this stays off on the web. */
-const OBS_ENABLED = false;
+/** BoM refuses browser requests, so a GitHub Actions job republishes the same station readings as obs.json beside the site. */
+const OBS_ENABLED = true;
 const COURSE = { name: 'Albert Park Golf Course', region: 'Melbourne VIC', lat: -37.845, lon: 144.972 };
 const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR;
-const round2 = v => Math.round(v * 100) / 100;
-const placeKey = (lat, lon) => `${lat.toFixed(2)},${lon.toFixed(2)}`;
+/** Forecast points snap to a 0.05° (~5 km) grid, the same in the Android app, so both ask Open-Meteo for the same point. */
+const round2 = v => Math.round(v * 20) / 20;
+const placeKey = (lat, lon) => `${round2(lat).toFixed(2)},${round2(lon).toFixed(2)}`;
 const R = x => Math.round(x);
 const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
 const fmod = (a, n) => ((a % n) + n) % n;
@@ -36,7 +37,7 @@ async function getJSON(url, headers, attempt = 0) {
   catch (e) { if (attempt < 1 && (e.name === 'AbortError' || e.name === 'TypeError')) return getJSON(url, headers, attempt + 1); throw e.name === 'AbortError' ? new Error('Request timed out') : e; }
 }
 async function getOnce(url, headers) {
-  if (!url.startsWith('https://')) throw new Error('Refusing non-HTTPS request');
+  if (!url.startsWith('https://') && !url.startsWith(location.origin + '/')) throw new Error('Refusing non-HTTPS request');
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 20000);
   try {
@@ -205,9 +206,13 @@ const Repo = {
   refreshAir(lat, lon, maxAge) { return this.refresh('air', lat, lon, maxAge, 'open-meteo', OM.airUrl(round2(lat), round2(lon)), b => OM.parseAir(b)); },
   async refreshObs(lat, lon, maxAge) {
     if (this.fresh('obs', lat, lon, maxAge)) return false;
-    Quota.acquire('metar');
-    const arr = await getJSON(Obs.url(round2(lat), round2(lon)));
-    this.put('obs', lat, lon, Obs.parse(arr, lat, lon));
+    const j = await getJSON(new URL('obs.json', location.href).href + '?t=' + Math.floor(Date.now() / MIN));
+    const now = Date.now();
+    const best = (j.stations || []).filter(o => now - o.at < 2 * HOUR)
+      .map(o => ({ ...o, distanceKm: Obs.distanceKm(lat, lon, o.lat, o.lon) })).filter(o => o.distanceKm <= 60)
+      .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+    if (!best) throw new Error('No live station nearby');
+    this.put('obs', lat, lon, best);
     return true;
   },
   refreshPollen(lat, lon, key, maxAge) {

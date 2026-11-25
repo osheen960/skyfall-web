@@ -362,7 +362,7 @@ function renderData() {
     <div class="m ac" style="font-size:11px;letter-spacing:2px;margin-top:8px">${countdown}</div>`, { key: 'solar', i: 8 });
   const o = w.obs;
   $('#p-data').innerHTML = `<div class="col"><div class="tiles">${uvT}${windT}${humT}${feelsT}${precipT}${visT}${presT}${cloudT}</div>${solar}
-    <div class="footer">DATA // OPEN-METEO.COM (CC BY 4.0) · NATIONAL MODEL BLEND${o ? `\nOBS // ${esc(o.station.toUpperCase())} (${esc(o.source)}) · ${R((Date.now() - o.at) / MIN)} MIN OLD` : '\nNOW // MODEL ANALYSIS (BROWSER BUILD: STATION FEEDS BLOCK BROWSERS)'}\nSKYFALL ATMOS WEB</div></div>`;
+    <div class="footer">DATA // OPEN-METEO.COM (CC BY 4.0) · NATIONAL MODEL BLEND${o ? `\nOBS // ${esc(o.station.toUpperCase())} (${esc(o.source)}) · ${R((Date.now() - o.at) / MIN)} MIN OLD` : '\nNOW // MODEL ONLY · NO LIVE STATION IN RANGE'}\nSKYFALL ATMOS WEB</div></div>`;
   mountPanels($('#p-data'));
 }
 
@@ -445,7 +445,7 @@ function teeSheet(g, slot) {
 function renderGolf() {
   const gw = S.golfW, el = $('#p-golf'); pIndex = 0;
   const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${COURSE.name.toUpperCase()}</div>
-    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M${S.golfW.obs ? ' · OBS ' + esc(S.golfW.obs.station.toUpperCase()) : ''}` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
   if (!gw) { el.innerHTML = `<div class="col">${banner(false)}</div>`; return; }
   const t0 = dkey(gw.current.time), days = gw.daily.slice(0, 7);
   if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Golf.defaultDay(gw); S.golfDay = days.some(d => d.date === def) ? def : t0; }
@@ -550,7 +550,7 @@ async function refresh(force = false) {
     if (changed) { loadFromCache(); renderAll(); }
     await quiet(() => Repo.refreshAir(p.lat, p.lon, force ? 10 * MIN : 60 * MIN));
     if (S.pollenKey) { try { if (await Repo.refreshPollen(p.lat, p.lon, S.pollenKey, force ? HOUR : 6 * HOUR)) changed = true; S.pollenError = null; } catch (e) { S.pollenError = e.message; changed = true; } }
-    await quiet(() => Repo.refreshForecast(COURSE.lat, COURSE.lon, 60 * MIN));
+    await quiet(() => Repo.refreshForecast(COURSE.lat, COURSE.lon, 20 * MIN));
     if (OBS_ENABLED) await quiet(() => Repo.refreshObs(COURSE.lat, COURSE.lon, 10 * MIN));
     if (changed) { loadFromCache(); renderAll(); }
   } finally { busy = false; }
