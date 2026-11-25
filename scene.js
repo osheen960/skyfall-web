@@ -67,7 +67,7 @@ const Scene = (() => {
       const x = W * 0.86, y = H * 0.3, r = 18, ph = input.moon;
       ctx.fillStyle = `rgba(230,240,255,${0.9 - overcast * 0.6})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
       const off = 2 * r * (1 - Math.abs(0.5 - ph) * 2) * (ph < 0.5 ? -1 : 1);
-      if (Math.abs(off) < 2 * r) { ctx.fillStyle = top; ctx.beginPath(); ctx.arc(x + off, y, r + 0.5, 0, 7); ctx.fill(); }
+      if (Math.abs(off) < 2 * r) { ctx.fillStyle = lerpHex(top, bottom, y / H); ctx.beginPath(); ctx.arc(x + off, y, r + 0.5, 0, 7); ctx.fill(); }
     }
 
     const tint = isNight ? 'rgba(120,130,170,A)' : 'rgba(220,232,245,A)';
