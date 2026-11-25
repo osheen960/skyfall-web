@@ -206,7 +206,7 @@ function renderGolf() {
   const gd = Golf.day(gw, S.golfDay);
   let slot = gd.windows.find(x => x.tee === S.golfSlot) || gd.best; S.golfSlot = slot ? slot.tee : null;
   const lines = Caddie.dayLines(gd);
-  const tees = gd.windows.map(t => `<button class="tee ${t === gd.best ? 'best' : ''}" data-tee="${t.tee}" aria-pressed="${t === slot}"><span>${hm(t.tee)}</span><b style="color:${scoreCol(t.score)}">${t.score}</b></button>`).join('');
+  const tees = gd.windows.map(t => `<button class="tee ${t === gd.best ? 'best' : ''}" style="border-color:color-mix(in srgb,${scoreCol(t.score)} 45%,transparent)" data-tee="${t.tee}" aria-pressed="${t === slot}"><span>${hm(t.tee)}</span><b style="color:${scoreCol(t.score)}">${t.score}</b></button>`).join('');
   const tabs = ['BRIEF', 'SCORE', 'FLIGHT', 'SHEET'].map(t => `<button data-gtab="${t}" aria-pressed="${S.golfTab === t}">${t}</button>`).join('');
   let body = '';
   if (!slot && S.golfTab !== 'SHEET') body = panel('No tee window', '--', `<p class="small">${esc(Caddie.banter(gd))}</p>`, 'full');
@@ -217,7 +217,8 @@ function renderGolf() {
   const dLabel = gd.date === dkey(gw.current.time) ? 'TODAY' : DOWL[dow(T(gd.date + 'T00:00'))].toUpperCase();
   el.innerHTML = `<div class="wrap">
     ${panel(COURSE.name, COURSE.region.toUpperCase(), `<p class="small">Course forecast is always for Albert Park, whatever place is on CORE. ${gw.obs ? `Live: ${esc(gw.obs.station)} ${R((Date.now() - gw.obs.at) / MIN)} min ago.` : ''}</p>`, 'full')}
-    <div class="full">${dayChips(gw, gd.date, 'golf')}</div>
+    <div class="full chips" data-chips="golf">${gw.daily.slice(0, 7).map((d, i) => { const b = Golf.day(gw, d.date).best;
+      return `<button class="chip" data-day="${d.date}" aria-pressed="${d.date === gd.date}"><span>${i === 0 ? 'TODAY' : DOW[dow(d.ms)] + ' ' + Number(d.date.slice(8))}</span><span class="t" style="color:${b ? scoreCol(b.score) : 'var(--faint)'}">${b ? b.score : '--'}</span></button>`; }).join('')}</div>
     <div class="full lbl">${dLabel} · ${gd.windows.length} TEE WINDOWS · 4 H ROUND</div>
     <div class="full tees">${tees || '<span class="small">No daylight tee times left.</span>'}</div>
     <div class="full tabs">${tabs}</div>
