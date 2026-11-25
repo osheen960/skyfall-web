@@ -59,29 +59,6 @@ function dayChips(w, selected, onKey, days = 7) {
 }
 
 /* ---------- CORE ---------- */
-function coreSvg(w) {
-  const c = w.current, d = dayOf(w, dkey(c.time)) || w.daily[0];
-  const lo = Math.min(d.min, c.temperature), hi = Math.max(d.max, c.temperature);
-  const f = hi > lo ? (c.temperature - lo) / (hi - lo) : 0.5;
-  const C = 170, r = 128, start = 135, sweep = 270;
-  const pt = (a, rr) => { const t = (a - 90) * Math.PI / 180; return [C + rr * Math.cos(t), C + rr * Math.sin(t)]; };
-  const ticks = Array.from({ length: 40 }, (_, i) => { const a = start + sweep * i / 39, on = i / 39 <= f; const [x1, y1] = pt(a + 90, r); const [x2, y2] = pt(a + 90, r - 14);
-    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${on ? lerpHex('#00e5ff', '#9dff5c', i / 39) : 'rgba(230,251,255,.12)'}" stroke-width="6" stroke-linecap="round"/>`; }).join('');
-  const [kx, ky] = pt(start + sweep * f + 90, r - 7);
-  const label = Codes.label(c.code).toUpperCase();
-  return `<svg viewBox="0 0 340 340" role="img" aria-label="${R(c.temperature)} degrees, ${esc(label)}">
-    <g class="spin"><circle cx="170" cy="170" r="160" fill="none" stroke="var(--ac)" stroke-opacity=".35" stroke-dasharray="2 9"/></g>
-    <g class="spin rev"><circle cx="170" cy="170" r="104" fill="none" stroke="var(--ac)" stroke-opacity=".25" stroke-dasharray="40 14 4 14"/></g>
-    ${ticks}
-    <circle cx="${kx}" cy="${ky}" r="9" fill="#fff"/><circle cx="${kx}" cy="${ky}" r="18" fill="#9dff5c" fill-opacity=".25"/>
-    <text x="170" y="112" text-anchor="middle" fill="var(--ac)" font-family="Share Tech Mono, monospace" font-size="15" letter-spacing="3">// ${esc(label)}</text>
-    <text x="164" y="212" text-anchor="middle" fill="#e6fbff" font-family="Rajdhani, sans-serif" font-weight="300" font-size="118">${R(c.temperature)}</text>
-    <text x="236" y="140" fill="var(--ac)" font-family="Rajdhani, sans-serif" font-size="30">°C</text>
-    <text x="170" y="252" text-anchor="middle" fill="rgba(230,251,255,.7)" font-family="Share Tech Mono, monospace" font-size="14" letter-spacing="3">FEELS ${R(c.feelsLike)}°</text>
-    <text x="96" y="300" text-anchor="middle" fill="#7fd4ff" font-family="Share Tech Mono, monospace" font-size="15">L ${deg(d.min)}</text>
-    <text x="244" y="300" text-anchor="middle" fill="#ffc23d" font-family="Share Tech Mono, monospace" font-size="15">H ${deg(d.max)}</text>
-  </svg>`;
-}
 let quipCache = {};
 function renderCore() {
   const w = sel(); if (!w) return;
@@ -102,7 +79,13 @@ function renderCore() {
   const tx = Advisor.bulletin(w, S.air, pollen, S.place ? S.place.name : '', S.golfW);
   $('#p-core').innerHTML = `<div class="wrap">
     <div class="full">${dayChips(S.w, dkey(c.time), 'core')}</div>
-    <div class="core">${coreSvg(w)}</div>
+    <div class="full"><div class="core" id="core" role="img" aria-label="${R(c.temperature)} degrees, ${esc(Codes.label(c.code))}">
+      <canvas></canvas>
+      <div class="core-read"><div class="cl" data-text="${esc('// ' + Codes.label(c.code).toUpperCase())}"></div>
+        <div class="ct"><span class="tv" data-text="${isNaN(c.temperature) ? '--' : R(c.temperature)}"></span><span class="tu">°C</span></div>
+        <div class="cf">FEELS ${deg(c.feelsLike)}</div></div>
+      <div class="core-lh"><span style="color:${tempColor(Math.min((dayOf(w, dkey(c.time)) || w.daily[0]).min, c.temperature))}">L ${deg(Math.min((dayOf(w, dkey(c.time)) || w.daily[0]).min, c.temperature))}</span><span style="color:${tempColor(Math.max((dayOf(w, dkey(c.time)) || w.daily[0]).max, c.temperature))}">H ${deg(Math.max((dayOf(w, dkey(c.time)) || w.daily[0]).max, c.temperature))}</span></div>
+    </div><div class="hint">TAP CORE TO RECALIBRATE</div></div>
     ${panel('Quick read', isToday ? (w.obs ? 'OBS' : 'MODEL') : 'FORECAST', `<div class="qgrid">
       <div><div class="lbl">Wind ${compass16(c.windDirection)}</div><div class="val">${R(c.windSpeed)} <small class="mono">KM/H</small></div></div>
       <div><div class="lbl">Rain 24h</div><div class="val">${pop24}%</div></div>
@@ -115,6 +98,7 @@ function renderCore() {
     ${panel('Comms // atmos-7 transmission', 'RX', `<div class="comms" id="comms"></div>`, 'full')}
   </div>`;
   typewrite($('#comms'), tx);
+  Core.mount($('#core'), w);
 }
 const typed = {};
 function typewrite(el, tx) {
@@ -386,7 +370,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#s
 const pager = $('#pager');
 function goTab(i, smooth = true) { S.tab = i; pager.scrollTo({ left: i * pager.clientWidth, behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
 $('#dock').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) goTab(+b.dataset.tab); });
-let scrollT; pager.addEventListener('scroll', () => { clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pager.clientWidth); if (i !== S.tab) { S.tab = i; renderDock(); } }, 80); }, { passive: true });
+let scrollT; pager.addEventListener('scroll', () => { clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pager.clientWidth); if (i !== S.tab) { S.tab = i; renderDock(); if (i === 0) Core.replay(); } }, 80); }, { passive: true });
 addEventListener('resize', () => goTab(S.tab, false));
 document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goTab(Math.min(5, S.tab + 1)); if (e.key === 'ArrowLeft') goTab(Math.max(0, S.tab - 1)); });
 
@@ -412,7 +396,7 @@ async function boot() {
   const lines = ['SKYFALL // ATMOS-7 WEB LINK', '> HANDSHAKE ........ OK', '> OPEN-METEO ....... LINKED', '> FAIRWAY UPLINK ... ARMED'];
   const bl = $('.boot-lines'); let i = 0;
   await new Promise(res => { const step = () => { if (i >= lines.length || reduce) { bl.textContent = lines.join('\n'); return res(); } bl.textContent = lines.slice(0, ++i).join('\n'); setTimeout(step, 160); }; step(); });
-  setTimeout(() => $('#boot').classList.add('gone'), reduce ? 0 : 300);
+  setTimeout(() => { $('#boot').classList.add('gone'); Core.replay(); }, reduce ? 0 : 300);
   const h = location.hash.slice(1).toUpperCase(), ti = TABS.findIndex(t => t[0] === h);
   loadFromCache(); renderAll();
   if (ti > 0) requestAnimationFrame(() => goTab(ti, false));

@@ -65,10 +65,16 @@ h1{margin:0;font-weight:600;font-size:clamp(24px,7vw,34px);letter-spacing:.04em;
 .chip .t{font:600 18px Rajdhani}
 .chip svg{width:26px;height:26px}
 
-.core{display:grid;place-items:center;position:relative;padding:6px 0;overflow:hidden}
-.core svg{width:min(78vw,340px);height:auto;overflow:visible}
-.spin{transform-origin:170px 170px;animation:spin 40s linear infinite}
-.spin.rev{animation-duration:70s;animation-direction:reverse}
+.core{position:relative;width:min(88vw,360px);aspect-ratio:1;margin:0 auto;cursor:pointer;-webkit-user-select:none;user-select:none}
+.core canvas{position:absolute;inset:0;width:100%;height:100%}
+.core-read{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.core .cl{font:12px 'Share Tech Mono',monospace;letter-spacing:.18em;color:var(--ac);white-space:nowrap}
+.core .ct{display:flex;align-items:flex-start;line-height:1}
+.core .tv{font:300 clamp(80px,26vw,104px)/1 Rajdhani,sans-serif;font-variant-numeric:tabular-nums}
+.core .tu{font:500 26px Rajdhani,sans-serif;color:var(--ac);margin-top:14px}
+.core .cf{font:12px 'Share Tech Mono',monospace;letter-spacing:.18em;color:var(--dim)}
+.core-lh{position:absolute;left:19%;right:19%;bottom:8px;display:flex;justify-content:space-between;font:12px 'Share Tech Mono',monospace}
+.hint{text-align:center;font:9px 'Share Tech Mono',monospace;letter-spacing:.2em;color:var(--faint);margin-top:4px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 .qgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 10px}
@@ -148,7 +154,7 @@ h1{font-size:22px}.coords{display:none}.sq{width:40px;height:40px}
 #pager{padding-top:calc(env(safe-area-inset-top) + 56px)}
 .page{padding:4px max(12px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 56px) max(12px,env(safe-area-inset-left))}
 #dock button{min-height:44px;padding:8px 0}#dock button small{display:none}
-.core svg{width:auto;height:min(72vh,300px)}
+.core{width:min(72vh,300px)}
 .page>.wrap{max-width:980px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.page>.wrap>.full{grid-column:1/-1}
 #toast{top:calc(env(safe-area-inset-top) + 56px)}
 .qgrid .val{font-size:20px}.qgrid .val.txtv{font-size:17px}}
