@@ -1,0 +1,16 @@
+{
+  "name": "Skyfall",
+  "short_name": "Skyfall",
+  "description": "Sci-fi HUD weather with live station data, golf forecasts and a sarcastic comms feed.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020409",
+  "theme_color": "#020409",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
