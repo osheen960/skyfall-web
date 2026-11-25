@@ -704,7 +704,7 @@ async function boot() {
   const halfHour = () => { if (!document.hidden && S.tab === 0) Core.replay(); setTimeout(halfHour, nextHalf()); };
   setTimeout(halfHour, nextHalf());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
 }
 boot();
 }
