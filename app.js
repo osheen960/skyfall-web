@@ -119,7 +119,7 @@ function quickGrid(w, isToday) {
   const c = w.current;
   const rainMax = Math.max(0, ...w.hourly.slice(0, 25).map(h => h.pop || 0));
   const uv = (w.daily[0] && w.daily[0].uvMax) || 0;
-  const gw = S.golfW || S.w, gdate = Golf.defaultDay(S.w), gd = Golf.day(gw, gdate);
+  const gw = golfSource(), gdate = Golf.defaultDay(S.w), gd = Golf.day(gw, gdate);
   const pollen = S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), pl = pollenFor(w, pollen);
   const cells = [
     [`WIND ${compass16(c.windDirection)}`, `${R(c.windSpeed)} KM/H`, INK],
@@ -147,7 +147,7 @@ function loadout(w, isToday) {
   return panel(title, `${lo.items.length}/${Gear.length} ON`, `<div class="lo">${cells}</div>`, { key: 'loadout', i: 1 });
 }
 function comms(w) {
-  const tx = Advisor.bulletin(w, S.air, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), S.place ? S.place.name : 'Sector', S.golfW);
+  const tx = Advisor.bulletin(w, S.air, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), S.place ? S.place.name : 'Sector', golfSource());
   return { html: panel('Comms // atmos bulletin', `TX-${String(tx.length).padStart(2, '0')}`, `<div id="comms" data-stamp="${hm(w.current.time)}"></div>`, { key: 'comms', i: 2 }), tx };
 }
 function renderCore() {
@@ -450,10 +450,12 @@ function teeSheet(g, slot) {
     <div class="th" style="padding-bottom:4px"><span style="width:48px;font-size:8px">TEE</span><span style="flex:1;font-size:8px">SCORE /100</span><span style="width:42px;font-size:8px">RAIN</span><span style="width:50px;font-size:8px">WIND</span><span style="width:42px;font-size:8px">LIMIT</span></div>${rows}`, { key: 'gsheet', i: 0 });
 }
 function renderGolf() {
-  const gw = S.golfW, el = $('#p-golf'); pIndex = 0;
+  const course = nearCourse(), gw = course ? S.golfW : S.w, el = $('#p-golf'); pIndex = 0;
   const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${COURSE.name.toUpperCase()}</div>
     <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
-  if (!gw) { el.innerHTML = `<div class="col">${banner(false)}</div>`; return; }
+  const generic = () => `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">GOLF // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">GENERIC CONDITIONS FOR YOUR LOCATION · NO COURSE LOCK</div></div></div>`;
+  if (!gw) { el.innerHTML = `<div class="col">${course ? banner(false) : generic()}</div>`; return; }
   const t0 = dkey(gw.current.time), days = gw.daily.slice(0, 7);
   if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Golf.defaultDay(gw); S.golfDay = days.some(d => d.date === def) ? def : t0; }
   const g = Golf.day(gw, S.golfDay), slot = g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
@@ -467,7 +469,7 @@ function renderGolf() {
   else if (S.golfTab === 'SCORE') body = scoreSummary(g.date, slot, g, 0) + (slot ? breakdown(slot) : '');
   else if (S.golfTab === 'FLIGHT') body = slot ? flight(slot) : none;
   else body = teeSheet(g, slot);
-  el.innerHTML = `<div class="col" style="gap:10px">${banner(true)}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
+  el.innerHTML = `<div class="col" style="gap:10px">${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
   mountPanels(el);
   if (up) typeUplink($('#uplink'), up.text);
 }
@@ -500,15 +502,20 @@ function renderAir() {
   mountPanels($('#p-air'));
 }
 
+/* ---------- golf location: Albert Park only when you're in Melbourne ---------- */
+const nearCourse = () => !S.place || Obs.distanceKm(S.place.lat, S.place.lon, COURSE.lat, COURSE.lon) <= 50;
+const golfSource = () => (nearCourse() ? S.golfW || S.w : S.w);
+
 /* ---------- chrome ---------- */
 const sel = () => S.w ? forDay(S.w, S.coreDay || dkey(S.w.current.time)) : null;
 function toast(msg) { const t = $('#toast'); if (!msg) { t.hidden = true; return; } t.textContent = '⚠ ' + msg.toUpperCase(); t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 6000); }
 function renderTop() {
-  const w = S.w, name = S.place ? S.place.name : 'SKYFALL';
+  const atCourse = S.tab === 4 && nearCourse() && S.golfW;
+  const w = atCourse ? S.golfW : S.w, name = atCourse ? 'Albert Park' : S.place ? S.place.name : 'SKYFALL';
   if ($('#placeName').dataset.v !== name) { $('#placeName').dataset.v = name; $('#placeName').dataset.done = ''; decodeText($('#placeName'), name.toUpperCase(), 700); }
   if (!w) return;
-  const lat = S.place ? S.place.lat : w.lat, lon = S.place ? S.place.lon : w.lon;
-  $('#coords').textContent = `${Math.abs(lat).toFixed(3)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lon).toFixed(3)}°${lon >= 0 ? 'E' : 'W'}${S.place && S.place.gps ? ' · GPS' : ''}`;
+  const lat = atCourse ? COURSE.lat : S.place ? S.place.lat : w.lat, lon = atCourse ? COURSE.lon : S.place ? S.place.lon : w.lon;
+  $('#coords').textContent = `${Math.abs(lat).toFixed(3)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lon).toFixed(3)}°${lon >= 0 ? 'E' : 'W'}${atCourse ? ' · COURSE' : S.place && S.place.gps ? ' · GPS' : ''}`;
   const clock = new Date(localNow(w.off)).toISOString().slice(11, 19), mins = R((Date.now() - w.fetchedAt) / MIN);
   $('#dot').classList.toggle('model', w.fetchedAt < slotStart());
   $('#liveLabel').textContent = `OPEN-METEO · ${clock} · ${mins < 1 ? 'SYNC  T+00M' : mins < 60 ? `SYNC  T+${mins}M` : `SYNC  T+${Math.floor(mins / 60)}H`}`;
@@ -613,9 +620,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#s
 
 const pager = $('#pager');
 const pageW = () => pager.querySelector('.page').offsetWidth || pager.clientWidth;
-function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); if (i === 1) Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
+function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; renderTop(); pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); if (i === 1) Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
 $('#dock').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) goTab(+b.dataset.tab); });
-let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderDock(); if (i === 0) Core.replay(); if (i === 1) Scope.replay(); } }, 80); }, { passive: true });
+let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderTop(); renderDock(); if (i === 0) Core.replay(); if (i === 1) Scope.replay(); } }, 80); }, { passive: true });
 addEventListener('resize', () => { goTab(S.tab, false); coreness(); });
 document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goTab(Math.min(5, S.tab + 1)); if (e.key === 'ArrowLeft') goTab(Math.max(0, S.tab - 1)); });
 
