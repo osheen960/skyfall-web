@@ -6,7 +6,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS = [['CORE', 'CORE'], ['24H', 'SCAN'], ['10D', 'TRAJ'], ['DATA', 'DATA'], ['GOLF', 'GOLF'], ['AIR', 'AIR']];
 const GOOGLE_KEY = /^AIza[0-9A-Za-z_-]{35}$/;
-const INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff2bd6', GOOD = '#3dff9a';
+const INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff3b30', GOOD = '#3dff9a';
 const AC = () => getComputedStyle(document.documentElement).getPropertyValue('--ac').trim() || '#00e5ff';
 
 const S = {
@@ -77,7 +77,7 @@ function icon(code, day = true, size = 18, tint) {
   const g = (d, col, extra = '') => `<path class="glow" d="${d}" stroke="${col}" stroke-width="4.6" fill="none" ${extra}/><path d="${d}" stroke="${col}" stroke-width="1.6" fill="none" ${extra}/>`;
   const sunD = 'M12 7.4a4.6 4.6 0 1 0 .01 0z', rays = [0, 45, 90, 135, 180, 225, 270, 315].map(a => { const r1 = 6.8, r2 = 9.2, t = a * Math.PI / 180; return `M${12 + r1 * Math.cos(t)} ${12 + r1 * Math.sin(t)}L${12 + r2 * Math.cos(t)} ${12 + r2 * Math.sin(t)}`; }).join('');
   const sun = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g(sunD, AMBER)}<g class="rays">${g(rays, AMBER)}</g></g>`;
-  const moon = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g('M15 4.6a7.6 7.6 0 1 0 4.6 12.6A6.2 6.2 0 0 1 15 4.6z', '#b9a8ff')}</g>`;
+  const moon = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g('M15 4.6a7.6 7.6 0 1 0 4.6 12.6A6.2 6.2 0 0 1 15 4.6z', '#cfe3ff')}</g>`;
   const cloudD = (y = 0) => `M6.6 ${17.6 + y}h10.6a3.6 3.6 0 0 0 .3-7.2 5.4 5.4 0 0 0-10.3-1.2 4.2 4.2 0 0 0-.6 8.4z`;
   let b;
   switch (sky) {
@@ -87,7 +87,7 @@ function icon(code, day = true, size = 18, tint) {
     case 'FOG': b = `<g class="drift">${g(cloudD(-3), ac)}</g>${g('M5 19h14M7 22h10', ac)}`; break;
     case 'DRIZZLE': case 'RAIN': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g>${[8.5, 12, 15.5].map((x, i) => `<g class="drop" style="animation-delay:${i * .33}s">${g(`M${x} 17.5l-1 ${sky === 'RAIN' ? 4 : 2.4}`, '#7fd4ff')}</g>`).join('')}`; break;
     case 'SNOW': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g>${[8.5, 12, 15.5].map((x, i) => `<g class="drop" style="animation-delay:${i * .4}s"><circle cx="${x}" cy="19.5" r="1.1" fill="${INK}"/></g>`).join('')}`; break;
-    case 'STORM': b = `<g class="drift">${g(cloudD(-3.5), MAGENTA)}</g><g class="bolt">${g('M12.6 15.2l-2.6 4.2h3l-1.4 3.6', '#ffd23d')}</g>`; break;
+    case 'STORM': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g><g class="bolt">${g('M12.6 15.2l-2.6 4.2h3l-1.4 3.6', '#ffd23d')}</g>`; break;
   }
   return `<svg class="ico" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
 }

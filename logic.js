@@ -527,19 +527,21 @@ function rgbToHsv([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max
 function hsvToHex(h, s, v) { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join(''); }
 function lerpHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, '0')).join(''); }
 function themeAccent(minute, rise, set, tempC, sky) {
-  const keys = [[rise - 60, '#8c7cff'], [rise - 10, '#ff7fa8'], [rise + 50, '#00e5ff'], [set - 100, '#00e5ff'], [set - 20, '#ffb547'], [set + 20, '#e06bff'], [set + 75, '#8c7cff']];
-  let tod = '#8c7cff';
+  const keys = [[rise - 60, '#5b8cff'], [rise - 10, '#ffb067'], [rise + 50, '#00e5ff'], [set - 100, '#00e5ff'], [set - 20, '#ffb547'], [set + 20, '#ff8a3d'], [set + 75, '#5b8cff']];
+  let tod = '#5b8cff';
   if (minute > keys[0][0] && minute < keys[keys.length - 1][0]) for (let k = 0; k < keys.length - 1; k++) { const [m0, c0] = keys[k], [m1, c1] = keys[k + 1]; if (minute >= m0 && minute <= m1) { tod = lerpHex(c0, c1, m1 > m0 ? (minute - m0) / (m1 - m0) : 0); break; } }
-  const ts = [[2, '#7fd4ff'], [12, '#00f0d0'], [19, '#9dff5c'], [25, '#ffc23d'], [31, '#ff6a3d'], [38, '#ff2b6a']];
+  const ts = [[2, '#7fd4ff'], [12, '#00f0d0'], [19, '#9dff5c'], [25, '#ffc23d'], [31, '#ff6a3d'], [38, '#ff3b30']];
   const t = isNaN(tempC) ? 18 : tempC;
   let tc; if (t <= ts[0][0]) tc = ts[0][1]; else if (t >= ts[5][0]) tc = ts[5][1]; else { const i = ts.findIndex(x => x[0] > t); tc = lerpHex(ts[i - 1][1], ts[i][1], (t - ts[i - 1][0]) / (ts[i][0] - ts[i - 1][0])); }
   const mix = (a, b, f) => { let d = b - a; if (d > 180) d -= 360; if (d < -180) d += 360; return fmod(a + d * f, 360); };
   const a = rgbToHsv(hexToRgb(tod)), b = rgbToHsv(hexToRgb(tc));
-  let h = mix(a[0], b[0], 0.38); if (sky === 'STORM') h = mix(h, rgbToHsv(hexToRgb('#ff2bd6'))[0], 0.35);
+  let h = mix(a[0], b[0], 0.38); if (sky === 'STORM') h = mix(h, 215, 0.35);
+  // No pinks or purples: hue blends that land in the magenta band snap to blue or orange.
+  if (h > 255 && h < 345) h = h < 300 ? 225 : 20;
   return hsvToHex(h, Math.max(a[1], b[1]) * 0.85, 1);
 }
 function tempColor(t) {
-  const st = [[-5, '#7a6bff'], [5, '#00b3ff'], [13, '#00f0d0'], [20, '#b6ff3d'], [26, '#ffd23d'], [32, '#ff7a3d'], [40, '#ff2b6a']];
+  const st = [[-5, '#5b7bff'], [5, '#00b3ff'], [13, '#00f0d0'], [20, '#b6ff3d'], [26, '#ffd23d'], [32, '#ff7a3d'], [40, '#ff3b30']];
   if (isNaN(t)) return '#e6fbff'; if (t <= st[0][0]) return st[0][1]; if (t >= st[6][0]) return st[6][1];
   const i = st.findIndex(x => x[0] > t); return lerpHex(st[i - 1][1], st[i][1], (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0]));
 }

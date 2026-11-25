@@ -31,7 +31,7 @@ const Scene = (() => {
   }
 
   function palette(m, rise, set) {
-    const night = ['#030512', '#0a1030'], dawn = ['#1a1240', '#ff7fa8'], day = ['#0a3a6b', '#3aa0d8'], golden = ['#2a1a4a', '#ffb547'], dusk = ['#140a30', '#e06bff'];
+    const night = ['#030512', '#0a1030'], dawn = ['#121a3e', '#ffb067'], day = ['#0a3a6b', '#3aa0d8'], golden = ['#141d42', '#ffb547'], dusk = ['#0a1236', '#3a6fd8'];
     const k = [[rise - 70, night], [rise, dawn], [rise + 60, day], [set - 90, day], [set - 10, golden], [set + 25, dusk], [set + 80, night]];
     if (m <= k[0][0] || m >= k[6][0]) return night;
     for (let i = 0; i < 6; i++) if (m >= k[i][0] && m <= k[i + 1][0]) { const f = (m - k[i][0]) / (k[i + 1][0] - k[i][0]); return [lerpHex(k[i][1][0], k[i + 1][1][0], f), lerpHex(k[i][1][1], k[i + 1][1][1], f)]; }
