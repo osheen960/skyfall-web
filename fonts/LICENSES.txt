@@ -1,0 +1,4 @@
+Fonts from Google Fonts (github.com/google/fonts), licensed under the SIL Open Font License 1.1
+(Rajdhani, Share Tech Mono, Cinzel, IM Fell English, Orbitron, Bebas Neue, Playfair Display,
+Space Grotesk, Fredoka, Comic Neue, Bangers, Marcellus, Righteous, Rye, Oswald) and the
+Apache License 2.0 (Special Elite). https://openfontlicense.org  https://www.apache.org/licenses/LICENSE-2.0

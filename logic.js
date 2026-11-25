@@ -481,7 +481,7 @@ const Advisor = {
     return { date, next, items: out.sort((a, b) => b.pri - a.pri) };
   },
 
-  bulletin(w, air, pollen, place, golfW) {
+  bulletin(w, air, pollen, place, golfW, act) {
     const hours = w.hourly.slice(0, 13), c = w.current;
     const temps = hours.map(h => h.temperature).filter(x => !isNaN(x));
     const tMax = temps.length ? Math.max(...temps) : c.temperature, tMin = temps.length ? Math.min(...temps) : c.temperature;
@@ -522,8 +522,13 @@ const Advisor = {
     if (pl && Air.peak(pl) >= 3.5 && !pl.asthma) P('BIO', `Pollen ${Air.upi(Air.peak(pl)).toLowerCase()}. Nature is attempting a hostile takeover via your sinuses.`);
     const aqi = aqiFor(w, air);
     if (aqi != null) { if (aqi <= 50) P('AIR', `Air quality good (${aqi}). Breathe freely, while stocks last.`); else P('AIR', `AQI ${aqi}. Air currently has texture. Consider limiting outdoor exertion.`, aqi > 150); }
-    const gw = golfW || w, sat = Golf.day(gw, Golf.defaultDay(gw));
-    if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + Caddie.banter(sat), sat.best.storm);
+    if (act && act.id === 'golf') {
+      const gw = golfW || w, sat = Golf.day(gw, Golf.defaultDay(gw));
+      if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + Caddie.banter(sat), sat.best.storm);
+    } else if (act) {
+      const date = dkey(w.current.time), b = Activities.day(w, date, act).best;
+      if (b) P(act.tag, `${act.name} today · ${b.score}/100. ` + Activities.brief(act, b, date), b.storm);
+    }
     P('SYS', 'Telemetry: Open-Meteo best-match blend. ATMOS-7 out.');
     return out;
   },
@@ -535,14 +540,20 @@ function rgbToHsv([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max
 function hsvToHex(h, s, v) { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join(''); }
 function lerpHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, '0')).join(''); }
 /* Light mode: neon is tuned for black; bright saturated colours are pulled down to read on white (same rule as Android Color.forMode). */
-let LIGHT = false;
+let LIGHT = false, THEME = null; // THEME: active CATALOG theme (null = Atmos)
 function M(hex) {
-  if (!LIGHT || typeof hex !== 'string' || hex[0] !== '#' || hex.length !== 7) return hex;
+  if (typeof hex !== 'string' || hex[0] !== '#' || hex.length !== 7) return hex;
+  if (THEME && THEME.mono) { // greyscale themes drain every colour (Android Color.forMode)
+    const [r, g, b] = hexToRgb(hex).map(x => x / 255), l = 0.299 * r + 0.587 * g + 0.114 * b, v = LIGHT ? l * 0.45 : 0.45 + l * 0.55;
+    const h = Math.round(v * 255).toString(16).padStart(2, '0'); return '#' + h + h + h;
+  }
+  if (!LIGHT) return hex;
   const [h, s, v] = rgbToHsv(hexToRgb(hex));
   if (v < 0.6 || s < 0.25) return hex;
   return hsvToHex(h, Math.min(1, s * 1.05), 0.56);
 }
 function themeAccent(minute, rise, set, tempC, sky) {
+  if (THEME && !THEME.dynamic) return (LIGHT ? THEME.light : THEME.dark).accent.toLowerCase();
   const keys = [[rise - 60, '#5b8cff'], [rise - 10, '#ffb067'], [rise + 50, '#00e5ff'], [set - 100, '#00e5ff'], [set - 20, '#ffb547'], [set + 20, '#ff8a3d'], [set + 75, '#5b8cff']];
   let tod = '#5b8cff';
   if (minute > keys[0][0] && minute < keys[keys.length - 1][0]) for (let k = 0; k < keys.length - 1; k++) { const [m0, c0] = keys[k], [m1, c1] = keys[k + 1]; if (minute >= m0 && minute <= m1) { tod = lerpHex(c0, c1, m1 > m0 ? (minute - m0) / (m1 - m0) : 0); break; } }
@@ -561,3 +572,77 @@ function tempColor(t) {
   if (isNaN(t)) return LIGHT ? '#0b1a28' : '#e6fbff'; if (t <= st[0][0]) return M(st[0][1]); if (t >= st[6][0]) return M(st[6][1]);
   const i = st.findIndex(x => x[0] > t); return M(lerpHex(st[i - 1][1], st[i][1], (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0])));
 }
+
+/* ---------- activities (mirror of Android data/Catalog.kt Activities) ---------- */
+const Activities = {
+  find(id) { return CATALOG.activities.find(a => a.id === id) || null; },
+  search(q) {
+    const s = q.trim().toLowerCase(); if (!s) return [];
+    return CATALOG.activities.map(a => {
+      const hay = `${a.name} ${a.tag} ${a.keywords}`.toLowerCase();
+      const rank = a.name.toLowerCase().startsWith(s) ? 0 : hay.split(/[ ()]/).some(x => x.startsWith(s)) ? 1 : hay.includes(s) ? 2 : -1;
+      return [rank, a];
+    }).filter(x => x[0] >= 0).sort((x, y) => x[0] - y[0] || (x[1].name < y[1].name ? -1 : 1)).map(x => x[1]);
+  },
+  defaultDay(w, a) { return a.id === 'golf' ? Golf.defaultDay(w) : dkey(w.current.time); },
+  day(w, date, a) {
+    if (a.id === 'golf') return Golf.day(w, date);
+    const d = dayOf(w, date); if (!d) return { date, windows: [], best: null };
+    const nowH = w.current.time - (w.current.time % HOUR), mid = T(date + 'T00:00');
+    let first, last;
+    if (a.when === 'night') { first = d.sunset + HOUR - ((d.sunset + HOUR) % HOUR); last = mid + DAY + 3 * HOUR; }
+    else if (a.when === 'any') { first = mid + 6 * HOUR; last = mid + 22 * HOUR - a.hours * HOUR; }
+    else { first = d.sunrise + 30 * MIN - ((d.sunrise + 30 * MIN) % HOUR); last = d.sunset - a.hours * HOUR; }
+    const windows = [];
+    w.hourly.forEach((h, i) => {
+      if (h.time < first || h.time > last || h.time < nowH) return;
+      const win = this.window(w.hourly.slice(i, i + a.hours), a); if (win) windows.push(win);
+    });
+    const best = windows.reduce((b, x) => (!b || x.score > b.score ? x : b), null);
+    return { date, windows, best };
+  },
+  window(hours, a) {
+    if (!hours.length) return null;
+    const temps = hours.map(h => h.temperature).filter(x => !isNaN(x));
+    const tMin = temps.length ? Math.min(...temps) : NaN, tMax = temps.length ? Math.max(...temps) : NaN;
+    const wind = hours.reduce((s, h) => s + h.wind, 0) / hours.length, gust = Math.max(...hours.map(h => h.gust));
+    const wet = a.snow ? hours.filter(h => h.temperature > 1) : hours;
+    const pop = wet.length ? Math.max(...wet.map(h => h.pop || 0)) : 0, mm = wet.reduce((s, h) => s + h.precip, 0);
+    const uv = Math.max(...hours.map(h => h.uv || 0)), storm = hours.some(h => h.code >= 95 && h.code <= 99);
+    const cloud = hours.reduce((s, h) => s + (h.cloud || 0), 0) / hours.length;
+    const vis = Math.min(...hours.map(h => (h.visibility == null ? 50000 : h.visibility) / 1000));
+    const raw = [];
+    if (storm) raw.push(['LIGHTNING', 80, 'storm cells in the window']);
+    raw.push(['RAIN', a.rainW * (pop * 0.35 + Math.min(30, mm * 8)), `${pop}% chance · ${f1(mm)} mm`]);
+    if (a.windMin > 0 && wind < a.windMin) raw.push(['CALM', (a.windMin - wind) * 2.5, `avg ${R(wind)} km/h (needs ${R(a.windMin)}+)`]);
+    else raw.push(['WIND', Math.max(0, wind - a.windMax) * a.windW + Math.max(0, gust - a.gustMax) * 0.6, `avg ${R(wind)} km/h · gust ${R(gust)}`]);
+    const heat = isNaN(tMax) ? 0 : Math.max(0, tMax - a.tHi) * a.heat, cold = isNaN(tMin) ? 0 : Math.max(0, a.tLo - tMin) * a.cold;
+    if (heat >= cold) raw.push(['HEAT', heat, `peak ${isNaN(tMax) ? '--' : R(tMax)}° (ideal ≤${R(a.tHi)}°)`]);
+    else raw.push(['COLD', cold, `low ${R(tMin)}° (ideal ≥${R(a.tLo)}°)`]);
+    if (uv >= 8 && a.uvW > 0) raw.push(['UV', 4 * a.uvW, `UV ${R(uv)}`]);
+    if (a.cloudW > 0) raw.push(['CLOUD', cloud * a.cloudW, `cover ${R(cloud)}%`]);
+    if (a.visMin > 0 && vis < a.visMin) raw.push(['VISIBILITY', (a.visMin - vis) * 8, `${f1(vis)} km (needs ${R(a.visMin)})`]);
+    const deductions = raw.map(([label, p, detail]) => ({ label, points: R(p), detail })).filter(d => d.points > 0);
+    const score = Math.max(0, Math.min(100, 100 - deductions.reduce((s, d) => s + d.points, 0)));
+    const worst = deductions.slice().sort((x, y) => y.points - x.points)[0];
+    return { tee: hours[0].time, score, tMin, tMax, wind, gust, dir: hours[hours.length >> 1].dir, pop, mm, uv, storm,
+      limiter: worst && worst.points >= 6 ? worst.label : 'NONE', deductions };
+  },
+  brief(a, t, date) {
+    if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing.`;
+    const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, n = a.name;
+    const o = {
+      LIGHTNING: ['Storm cells in the window. Postpone. Lightning does not negotiate.', `Thunderstorms forecast. ${n} can wait; you'd prefer to.`],
+      RAIN: [`Rain ${t.pop}% in the window. ${n} becomes an endurance event.`, `${t.pop}% chance of rain, ${f1(t.mm)} mm. Pack something waterproof and low expectations.`],
+      WIND: [`Wind ${R(t.wind)} km/h, gusts ${R(t.gust)}. ${n} will be aerodynamic.`, `Gusts to ${R(t.gust)} km/h. Hold onto anything you like.`],
+      CALM: [`Only ${R(t.wind)} km/h of breeze. Not enough to bother rigging.`, `Dead calm at ${R(t.wind)} km/h. Bring patience, or a fan.`],
+      HEAT: [`Peak ${R(t.tMax)}°. Hydrate like it's your job.`, `${R(t.tMax)}° at the top end. Shade breaks are not optional.`],
+      COLD: [`Low ${R(t.tMin)}°. Layers, then more layers.`, `${R(t.tMin)}° at the cold end. Warm up properly or regret it.`],
+      UV: [`UV ${R(t.uv)}. SPF50+ and a hat or shade.`, `UV ${R(t.uv)}: the sun is working overtime.`],
+      CLOUD: ['Cloud cover is the main problem. The sky is closed for viewing.', 'Too much cloud. Patience, or a different night.'],
+      VISIBILITY: ["Visibility is poor. You'll mostly see the inside of the haze.", 'Low visibility. Keep it close and keep it safe.'],
+    }[t.limiter] || [`As good as it gets. Score ${t.score}. No excuses.`, `Clean window. Score ${t.score}. Go.`];
+    const hour = new Date(t.tee).getUTCHours();
+    return `${span} · ${o[fmod(Math.floor(T(date + 'T00:00') / DAY) + hour, o.length)]}`;
+  },
+};

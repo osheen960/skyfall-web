@@ -9,15 +9,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Skyfall">
 <meta name="description" content="Skyfall — sci-fi HUD weather with live station data, golf forecasts and a sarcastic comms feed.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com https://geocoding-api.open-meteo.com https://pollen.googleapis.com https://api.bigdatacloud.net; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com https://geocoding-api.open-meteo.com https://pollen.googleapis.com https://api.bigdatacloud.net; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Skyfall</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;500;600&family=Share+Tech+Mono&display=swap">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -33,7 +31,7 @@
     <div class="coords" id="coords"></div>
   </div>
   <button class="sq" id="btnInstall" aria-label="Install app" hidden><svg viewBox="0 0 22 22"><path d="M11 3v11M6.5 9.5 11 14l4.5-4.5M4 18h14"/></svg></button>
-  <button class="sq" id="btnMode" aria-label="Light or dark mode"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="8.4"/><path class="solid" d="M11 2.6a8.4 8.4 0 0 0 0 16.8z"/></svg></button>
+  <button class="sq" id="btnSettings" aria-label="Settings"><svg viewBox="0 0 22 22"><path d="M11 1.5l1.6 2.3 2.7-.8.5 2.8 2.7.9-.9 2.7 2.3 1.6-2.3 1.6.9 2.7-2.7.9-.5 2.8-2.7-.8L11 20.5l-1.6-2.3-2.7.8-.5-2.8-2.7-.9.9-2.7L2.1 11l2.3-1.6-.9-2.7 2.7-.9.5-2.8 2.7.8z"/><circle cx="11" cy="11" r="2.6"/></svg></button>
   <button class="sq" id="btnAmbient" aria-label="Ambient mode"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="4.4"/><path d="M0 15.8h22" /><path d="M3.3 18.9h15.4" stroke-opacity=".5" stroke-width="1"/></svg></button>
   <button class="sq" id="btnSearch" aria-label="Search places"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button>
 </header>
@@ -60,14 +58,16 @@
   </div>
 </div>
 
+<div id="settings" role="dialog" aria-modal="true" aria-label="Settings" hidden></div>
 <div id="ambient" class="overlay ambient" hidden>
   <div class="amb-read"><div id="ambTemp"></div><div id="ambSky" class="mono"></div><div id="ambClock" class="mono"></div></div>
   <button class="txt amb-close" id="ambClose">[EXIT AMBIENT]</button>
 </div>
 
-<script src="logic.js?v=16"></script>
-<script src="scene.js?v=16"></script>
-<script src="core.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="catalog.js?v=17"></script>
+<script src="logic.js?v=17"></script>
+<script src="scene.js?v=17"></script>
+<script src="core.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -4,14 +4,41 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const TABS = [['CORE', 'CORE'], ['24H', 'SCAN'], ['10D', 'TRAJ'], ['DATA', 'DATA'], ['GOLF', 'GOLF'], ['AIR', 'AIR']];
+/* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
+const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true };
+const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
+Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
+const savePrefs = () => Store.set('prefs', Prefs);
+const primaryAct = () => Activities.find(Prefs.activities[0] || '') || null;
+const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air']];
+const TAB_PREF = { SCAN: 'SCAN', TRAJ: 'TRAJ', DATA: 'DATA', GOLF: 'ACT', AIR: 'AIR' };
+let TABS = ALL_TABS;
+function computeTabs() {
+  TABS = ALL_TABS.filter(([, k]) => k === 'CORE' || (!Prefs.hiddenTabs.includes(TAB_PREF[k]) && (k !== 'GOLF' || Prefs.activities.length)));
+  ALL_TABS.forEach(t => { const el = document.getElementById(t[2]); if (el) el.style.display = TABS.includes(t) ? '' : 'none'; });
+  if (S.tab >= TABS.length) S.tab = 0;
+}
+const tabKey = i => (TABS[i] ? TABS[i][1] : '');
+const curAct = () => { if (!Prefs.activities.includes(S.actId)) S.actId = Prefs.activities[0]; return Activities.find(S.actId || '') || null; };
 const GOOGLE_KEY = /^AIza[0-9A-Za-z_-]{35}$/;
 let INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff3b30', GOOD = '#3dff9a', VOID = '#020409';
 function setPalette() {
-  document.body.classList.toggle('light', LIGHT);
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content', LIGHT ? '#eef3f7' : '#020409');
-  INK = LIGHT ? '#0b1a28' : '#e6fbff'; VOID = LIGHT ? '#eef3f7' : '#020409';
-  AMBER = M('#ffb547'); ALERT = M('#ff4d6a'); MAGENTA = M('#ff3b30'); GOOD = M('#3dff9a');
+  THEME = CATALOG.themes.find(t => t.id === Prefs.theme) || CATALOG.themes[0];
+  const p = LIGHT ? THEME.light : THEME.dark, b = document.body, st = b.style, F = CATALOG.fonts;
+  const rgb = h => hexToRgb(h).join(',');
+  b.classList.toggle('light', LIGHT);
+  Object.assign(b.dataset, { shape: THEME.shape, backdrop: THEME.backdrop, sky: THEME.sky, theme: THEME.id });
+  document.documentElement.classList.toggle('mono', !!THEME.mono);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', p.bg);
+  st.setProperty('--void', p.bg); st.setProperty('--ink', p.ink); st.setProperty('--inkrgb', rgb(p.ink)); st.setProperty('--voidrgb', rgb(p.bg));
+  st.setProperty('--dim', `rgba(${rgb(p.ink)},${LIGHT ? .66 : .58})`); st.setProperty('--faint', `rgba(${rgb(p.ink)},${LIGHT ? .4 : .32})`);
+  st.setProperty('--fd', `'${THEME.display}'`); st.setProperty('--fl', `'${THEME.label}'`);
+  st.setProperty('--ds', F[THEME.display][1]); st.setProperty('--ls', F[THEME.label][1]); st.setProperty('--rad', THEME.radius + 'px');
+  st.setProperty('--shade', LIGHT ? '255,255,255' : rgb(lerpHex(p.bg, '#000000', .6)));
+  INK = p.ink.toLowerCase(); VOID = p.bg.toLowerCase();
+  AMBER = M('#ffb547'); ALERT = M(p.alert.toLowerCase()); MAGENTA = M('#ff3b30'); GOOD = M(p.good.toLowerCase());
+  st.setProperty('--alert', ALERT); st.setProperty('--good', GOOD); st.setProperty('--amber', AMBER);
+  $('#sky').hidden = !Prefs.liveSky;
 }
 const AC = () => getComputedStyle(document.documentElement).getPropertyValue('--ac').trim() || '#00e5ff';
 
@@ -50,10 +77,22 @@ function drawFrame(p) {
   if (!w || !h) return;
   let svg = p.querySelector(':scope>svg.frame');
   if (!svg) { svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'frame'); svg.setAttribute('aria-hidden', 'true'); p.prepend(svg); }
-  const d = `M${c} .5H${w - .5}V${h - c}L${w - c} ${h - .5}H.5V${c}Z`;
+  // Panel shape per theme (Android ui/Hud.kt panelPath / panelTrim).
+  const shape = THEME ? THEME.shape : 'chamfer', r = Math.min(THEME ? THEME.radius : 0, h / 2, w / 2);
+  const rect = `M.5 .5H${w - .5}V${h - .5}H.5Z`;
+  const rr = `M${r + .5} .5H${w - r - .5}A${r} ${r} 0 0 1 ${w - .5} ${r + .5}V${h - r - .5}A${r} ${r} 0 0 1 ${w - r - .5} ${h - .5}H${r + .5}A${r} ${r} 0 0 1 .5 ${h - r - .5}V${r + .5}A${r} ${r} 0 0 1 ${r + .5} .5Z`;
+  const d = shape === 'chamfer' ? `M${c} .5H${w - .5}V${h - c}L${w - c} ${h - .5}H.5V${c}Z` : ['round', 'outline', 'riveted'].includes(shape) ? rr : rect;
+  let trim = '';
+  if (shape === 'chamfer') trim = `<path class="br" d="M${w - l} 1H${w - 1}V${l}M1 ${h - l}V${h - 1}H${l}M1 ${c}L${c} 1M${w - c} ${h - 1}L${w - 1} ${h - c}"/>`;
+  else if (shape === 'square') { const k = 10; trim = `<path class="br" d="M1 ${k}V1H${k}M${w - k} 1H${w - 1}V${k}M1 ${h - k}V${h - 1}H${k}M${w - k} ${h - 1}H${w - 1}V${h - k}"/>`; }
+  else if (shape === 'ornate') { const i = 4, q = 4, dia = (x, y) => `M${x} ${y - q}L${x + q} ${y}L${x} ${y + q}L${x - q} ${y}Z`;
+    trim = `<rect class="br thin" x="${i}" y="${i}" width="${w - 2 * i}" height="${h - 2 * i}"/><path class="brf" d="${dia(i, i)}${dia(w - i, i)}${dia(i, h - i)}${dia(w - i, h - i)}"/>`; }
+  else if (shape === 'bar') trim = `<rect class="brf" x="0" y="0" width="${w}" height="3"/>`;
+  else if (shape === 'riveted') { const i = 7; trim = [[i, i], [w - i, i], [i, h - i], [w - i, h - i]].map(([x, y]) => `<circle class="brf" cx="${x}" cy="${y}" r="2.5"/>`).join(''); }
+  const shadow = shape === 'outline' ? `<path class="shadow" transform="translate(3 3)" d="${d}"/><path class="solid" d="${d}"/>` : '';
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-  svg.innerHTML = `<path class="fill" d="${d}"/><path class="tint" d="${d}"/><path class="edge" pathLength="1" d="${d}"/>
-    <path class="br" d="M${w - l} 1H${w - 1}V${l}M1 ${h - l}V${h - 1}H${l}M1 ${c}L${c} 1M${w - c} ${h - 1}L${w - 1} ${h - c}"/>`;
+  svg.setAttribute('overflow', 'visible');
+  svg.innerHTML = `${shadow}<path class="fill" d="${d}"/><path class="tint" d="${d}"/><path class="edge" pathLength="1" d="${d}"/>${trim}`;
 }
 function mountPanels(root) {
   root.querySelectorAll('.panel').forEach(p => {
@@ -125,15 +164,17 @@ function quickGrid(w, isToday) {
   const c = w.current;
   const rainMax = Math.max(0, ...w.hourly.slice(0, 25).map(h => h.pop || 0));
   const uv = (w.daily[0] && w.daily[0].uvMax) || 0;
-  const gw = golfSource(), gdate = Golf.defaultDay(S.w), gd = Golf.day(gw, gdate);
+  const act = TABS.some(t => t[1] === 'GOLF') ? primaryAct() : null;
+  const gdate = act ? Activities.defaultDay(S.w, act) : dkey(S.w.current.time), gd = act ? Activities.day(act.id === 'golf' ? golfSource() : w, gdate, act) : null;
   const pollen = S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), pl = pollenFor(w, pollen);
   const cells = [
     [`WIND ${compass16(c.windDirection)}`, `${R(c.windSpeed)} KM/H`, INK],
     [isToday ? 'RAIN 24H' : 'RAIN 06–06', `${rainMax}%`, rainMax >= 50 ? M('#00e5ff') : INK],
     ['UV PEAK', `${R(uv)}`, uv >= 8 ? ALERT : INK, uv >= 8],
     ['HUMIDITY', `${c.humidity ?? '--'}%`, INK],
-    [`GOLF ${DOW[dow(T(gdate + 'T00:00'))]} ›`, gd.best ? `${gd.best.score} · ${hm(gd.best.tee)}` : 'N/A', gd.best ? scoreColor(gd.best.score) : 'var(--dim)', false, 4],
-    ['POLLEN ›', pl ? Air.upi(Air.peak(pl)) : '--', pl ? pollenColor(Air.peak(pl)) : 'var(--dim)', pl && Air.peak(pl) >= 3.5, 5],
+    act ? [`${act.tag} ${gdate === dkey(c.time) ? 'TODAY' : DOW[dow(T(gdate + 'T00:00'))]} ›`, gd.best ? `${gd.best.score} · ${hm(gd.best.tee)}` : 'N/A', gd.best ? scoreColor(gd.best.score) : 'var(--dim)', false, 'GOLF']
+      : ['FEELS', deg(c.feelsLike), tempColor(c.feelsLike)],
+    ['POLLEN ›', pl ? Air.upi(Air.peak(pl)) : '--', pl ? pollenColor(Air.peak(pl)) : 'var(--dim)', pl && Air.peak(pl) >= 3.5, 'AIR'],
   ];
   return panel(null, null, `<div class="qg">${cells.map(([l, v, col, hz, go]) => `<${go ? `button data-go="${go}"` : 'div'}><div class="rl">${esc(l)}</div><div class="qv ${hz ? 'pulse' : ''}" style="color:${col}">${esc(v)}</div></${go ? 'button' : 'div'}>`).join('')}</div>`, { key: 'quick', i: 0 });
 }
@@ -155,7 +196,7 @@ function loadout(w, isToday) {
   return panel(title, `${lo.items.length}/${Gear.length} ON`, `<div class="lo">${cells}</div>`, { key: 'loadout', i: 1 });
 }
 function comms(w) {
-  const tx = Advisor.bulletin(w, S.air, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), S.place ? S.place.name : 'Sector', golfSource());
+  const tx = Advisor.bulletin(w, S.air, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), S.place ? S.place.name : 'Sector', golfSource(), TABS.some(t => t[1] === 'GOLF') ? primaryAct() : null);
   return { html: panel('Comms // atmos bulletin', `TX-${String(tx.length).padStart(2, '0')}`, `<div id="comms" data-stamp="${hm(w.current.time)}"></div>`, { key: 'comms', i: 2 }), tx };
 }
 function renderCore() {
@@ -175,14 +216,14 @@ function renderCore() {
         <div class="cf">FEELS ${deg(c.feelsLike)}</div>${tag ? `<div class="cday">${esc(tag)}</div>` : ''}</div>
       <div class="core-lh"><span style="color:${tempColor(lo)}">L ${deg(lo)}</span><span style="color:${tempColor(hi)}">H ${deg(hi)}</span></div>
     </div>
-    ${isToday && S.w.obs ? bomLine(S.w.obs) : ''}
-    ${quickGrid(w, isToday)}
-    ${loadout(w, isToday)}
-    ${cm.html}
+    ${isToday && S.w.obs && !Prefs.hiddenCore.includes('bom') ? bomLine(S.w.obs) : ''}
+    ${Prefs.hiddenCore.includes('quick') ? '' : quickGrid(w, isToday)}
+    ${Prefs.hiddenCore.includes('loadout') ? '' : loadout(w, isToday)}
+    ${Prefs.hiddenCore.includes('comms') ? '' : cm.html}
   </div>`;
   mountPanels($('#p-core'));
   Core.mount($('#core'), w);
-  typeComms($('#comms'), cm.tx);
+  if ($('#comms')) typeComms($('#comms'), cm.tx);
 }
 const typedSig = {};
 function typeComms(el, tx) {
@@ -261,7 +302,7 @@ const Scope = (() => {
     x.save(); x.beginPath(); x.rect(0, 0, W * tr, H); x.clip();
     x.lineCap = 'round'; x.strokeStyle = grad;
     x.globalAlpha = .18; x.lineWidth = 10; x.stroke(path); x.globalAlpha = .4; x.lineWidth = 4; x.stroke(path); x.globalAlpha = 1; x.strokeStyle = INK; x.lineWidth = 1.4; x.stroke(path);
-    x.font = '600 15px Rajdhani, sans-serif'; x.textAlign = 'center';
+    x.font = `600 ${R(15 * CATALOG.fonts[THEME.display][1])}px '${THEME.display}', sans-serif`; x.textAlign = 'center';
     pts.forEach(([px, py], i) => { x.fillStyle = VOID; x.fillRect(px - 2.5, py - 2.5, 5, 5); x.strokeStyle = tempColor(hours[i].temperature); x.lineWidth = 1.5; x.strokeRect(px - 2.5, py - 2.5, 5, 5); x.fillStyle = INK; x.fillText(deg(hours[i].temperature), px, py - 8); });
     x.restore();
     x.fillStyle = rgba(ac, .08); x.fillRect(0, 0, step, H);
@@ -390,20 +431,26 @@ function scoreRing(score, size = 104) {
   return `<div style="position:relative;width:${size}px;height:${size}px;flex:none"><svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${segs}</svg>
     <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><span class="d" style="font-weight:300;font-size:34px;line-height:1;color:${scoreColor(score)}" data-decode="${score}">${score}</span><span class="m dim" style="font-size:8px;letter-spacing:1.2px">SCORE · GRADE ${Golf.grade(score)}</span></div></div>`;
 }
+const actWords = () => { const a = curAct(), golf = !a || a.id === 'golf'; return { golf, sw: golf ? 'TEE' : 'START', name: golf ? 'Golf' : a.name, hrs: golf ? Golf.ROUND : a.hours }; };
 function scoreSummary(date, slot, g, i) {
-  const ac = AC(), isBest = slot && slot === g.best;
-  const title = `Golf score // ${DOW[dow(T(date + 'T00:00'))]} ${ddmm(date)}`;
+  const ac = AC(), isBest = slot && slot === g.best, W = actWords();
+  const title = `${W.name} score // ${DOW[dow(T(date + 'T00:00'))]} ${ddmm(date)}`;
   if (!slot) return panel(title, 'G-01', `<div class="m dim" style="font-size:11px">NO PLAYABLE DAYLIGHT WINDOW</div>`, { key: 'gscore', i });
   return panel(title, 'G-01', `<div style="display:flex;align-items:center;gap:14px">${scoreRing(slot.score)}
-      <div style="flex:1"><div class="m" style="font-size:10px;letter-spacing:2px;color:${isBest ? ac : 'var(--faint)'}">${isBest ? 'OPTIMAL TEE ◆' : 'SELECTED TEE'}</div>
+      <div style="flex:1"><div class="m" style="font-size:10px;letter-spacing:2px;color:${isBest ? ac : 'var(--faint)'}">${isBest ? `OPTIMAL ${W.sw} ◆` : `SELECTED ${W.sw}`}</div>
         <div class="d" style="font-weight:300;font-size:38px;line-height:1.05" data-decode="${hm(slot.tee)}">${hm(slot.tee)}</div>
-        <div class="m ac" style="font-size:10px;letter-spacing:1px">ROUND ${hm(slot.tee)}–${hm(slot.tee + Golf.ROUND * HOUR)}</div>
+        <div class="m ac" style="font-size:10px;letter-spacing:1px">${W.golf ? 'ROUND' : 'WINDOW'} ${hm(slot.tee)}–${hm(slot.tee + W.hrs * HOUR)}</div>
         ${!isBest && g.best ? `<div class="m faint" style="font-size:9px;letter-spacing:1px">BEST: ${hm(g.best.tee)} · ${g.best.score}</div>` : ''}</div></div>
     <div style="display:flex;justify-content:space-between;margin-top:12px">${readout('Temp', `${deg(slot.tMin)}–${deg(slot.tMax)}`, tempColor(slot.tMax))}${readout('Wind', `${R(slot.wind)} ${compass16(slot.dir)}`)}${readout('Gust', R(slot.gust), slot.gust >= 40 ? AMBER : INK)}${readout('Rain', slot.pop + '%', slot.pop >= 40 ? ac : INK)}${readout('UV', R(slot.uv), slot.uv >= 8 ? ALERT : INK)}</div>
     <div class="m" style="font-size:10px;letter-spacing:1px;margin-top:10px;color:${slot.limiter === 'NONE' ? ac : AMBER}">GRADE ${Golf.grade(slot.score)} · MAIN LIMITER: ${slot.limiter}</div>
-    <div class="tiny" style="margin-top:6px">THE SCORE IS PLAYABILITY FOR A 4-HOUR ROUND FROM THIS TEE TIME: 100 MINUS PENALTIES FOR LIGHTNING, RAIN, WIND, HEAT OR COLD AND UV. NOT A CHANCE OF RAIN.</div>`, { key: 'gscore', i });
+    <div class="tiny" style="margin-top:6px">${W.golf ? 'THE SCORE IS PLAYABILITY FOR A 4-HOUR ROUND FROM THIS TEE TIME: 100 MINUS PENALTIES FOR LIGHTNING, RAIN, WIND, HEAT OR COLD AND UV. NOT A CHANCE OF RAIN.' : `THE SCORE IS HOW GOOD A ${W.hrs}-HOUR WINDOW FROM THIS START IS FOR ${W.name.toUpperCase()}: 100 MINUS PENALTIES FOR WHAT MATTERS TO IT. NOT A CHANCE OF RAIN.`}</div>`, { key: 'gscore', i });
 }
 function uplink(date, slot, g) {
+  const a = curAct();
+  if (a && a.id !== 'golf') {
+    const text = Activities.brief(a, slot, date);
+    return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
+  }
   const lines = Caddie.dayLines(g), text = slot ? lines[slot.tee] : Caddie.banter(g);
   const freq = (121.5 + (Math.floor(T(date + 'T00:00') / DAY) % 37) * .25).toFixed(2);
   return { html: panel('Fairway uplink // transmission', `FQ ${freq}`, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} SLOT · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
@@ -423,7 +470,7 @@ function breakdown(t) {
   const ac = AC(), ds = t.deductions.slice().sort((a, b) => b.points - a.points);
   const rows = ds.map((d, i) => { const hot = d.points >= 15;
     return `<div class="ded calc-row" data-step="${i}" data-pts="${d.points}" style="opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s"><span class="k" style="color:${hot ? AMBER : INK}">${d.label}</span><div class="mid"><div class="m dim" style="font-size:9px">${esc(d.detail)}</div><div class="dbar"><i style="width:0;transition:width .75s cubic-bezier(.4,0,.2,1);background:${hot ? AMBER : ac}" data-w="${Math.max(2, Math.min(100, d.points / 80 * 100))}"></i></div></div><span class="dv" style="color:${hot ? AMBER : INK}">−${d.points}</span></div>`; }).join('');
-  return panel(`How ${t.score} is calculated // ${hm(t.tee)} tee`, 'G-02', `<div id="calc" data-score="${t.score}" data-grade="${Golf.grade(t.score)}">
+  return panel(`How ${t.score} is calculated // ${hm(t.tee)} ${actWords().sw.toLowerCase()}`, 'G-02', `<div id="calc" data-score="${t.score}" data-grade="${Golf.grade(t.score)}">
     <div style="display:flex;align-items:flex-end"><span class="d calc-n" style="font-weight:300;font-size:56px;line-height:1">100</span><span class="m dim" style="font-size:12px;margin:0 0 10px 4px">/100</span><span style="flex:1"></span><span class="m calc-g faint" style="font-size:12px;letter-spacing:2px;margin-bottom:10px">CALCULATING…</span></div>
     <div style="position:relative;height:10px;background:color-mix(in srgb,var(--ac) 8%,transparent);margin:6px 0 12px"><i class="calc-m" style="position:absolute;left:0;top:0;bottom:0;width:100%"></i><span style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(0,0,0,.5) 0 10%)"></span></div>
     <div class="ded" style="height:26px"><span class="k ink">START</span><span class="mid m faint" style="font-size:9px">perfect conditions</span><span class="dv good">100</span></div>
@@ -464,7 +511,7 @@ function flight(t) {
   return panel(`Ball flight // ${hm(t.tee)}`, 'G-03', `<div style="display:flex">${readout('Into wind', `+${Golf.clubs(into)} club`, AMBER, 'flex:1')}${readout('Downwind', `−${Golf.clubs(down)} club`, GOOD, 'flex:1')}${readout('Temp carry', `${carry >= 0 ? '+' : '−'}${Math.abs(carry)} m`, INK, 'flex:1')}</div>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:110px;margin-top:12px" preserveAspectRatio="none"><line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="${rgba(ac, .3)}"/>${arc(d.base, H * .36, INK, 0)}${arc(d.into, H * .44, AMBER, .94)}${arc(d.down, H * .30, GOOD, 1.9)}</svg>
       <div class="m" style="display:flex;font-size:8px;margin-top:4px"><span style="flex:1" class="ink">● CALM</span><span style="flex:1" class="amber">● INTO</span><span style="flex:1" class="good">● DOWN</span><span class="faint">DRIVER CARRY</span></div>`, { key: 'gflight', i: 0 })
-    + panel('Carry table // metres', 'G-05', `<div class="ctab"><div class="r th" style="height:auto;padding-bottom:4px"><span class="m" style="font:8px 'Share Tech Mono'">CLUB</span><span class="m" style="font:8px 'Share Tech Mono'">CALM</span><span class="m" style="font:8px 'Share Tech Mono'">INTO</span><span class="m" style="font:8px 'Share Tech Mono'">DOWN</span><span class="m" style="font:8px 'Share Tech Mono'">X-DRIFT</span></div>
+    + panel('Carry table // metres', 'G-05', `<div class="ctab"><div class="r th" style="height:auto;padding-bottom:4px"><span class="m" style="font-size:calc(8px * var(--ls))">CLUB</span><span class="m" style="font-size:calc(8px * var(--ls))">CALM</span><span class="m" style="font-size:calc(8px * var(--ls))">INTO</span><span class="m" style="font-size:calc(8px * var(--ls))">DOWN</span><span class="m" style="font-size:calc(8px * var(--ls))">X-DRIFT</span></div>
       ${rows.map((r, i) => `<div class="r reveal ${seen.has('gcarry') ? 'seen' : ''}" style="--r:${i}"><span class="mono11 ink" style="font-weight:400">${r.club}</span><span style="font-weight:500;color:var(--dim)">${r.base}</span><span class="amber">${r.into}</span><span class="good">${r.down}</span><span style="font-weight:500;color:${ac}">±${r.drift}</span></div>`).join('')}</div>
       <div class="m" style="font-size:9px;letter-spacing:1px;margin-top:8px;color:${t.gust >= 40 ? AMBER : 'var(--dim)'}">GUSTS ${R(t.gust)} KM/H: DRIVER INTO ${gusts[0].into} M · DRIFT ±${gusts[0].drift} M</div>
       <div class="tiny" style="margin-top:6px">BASELINE = MID-HANDICAP CALM-AIR CARRY AT 21°C. RULES OF THUMB: −1%/MPH INTO, +0.5%/MPH DOWN, 0.5%/MPH CROSS DRIFT.</div>`, { key: 'gcarry', i: 1 })
@@ -481,30 +528,39 @@ function teeSheet(g, slot) {
       <span class="mono11" style="width:42px;padding-left:6px;color:${t.pop >= 40 ? ac : 'var(--dim)'}">${t.pop}%</span>
       <span style="width:50px;display:flex;align-items:center;gap:3px">${windArrow(t.dir, 'rgba(var(--inkrgb),.58)', 10)}<span class="mono11" style="color:${t.gust >= 40 ? AMBER : 'var(--dim)'}">${R(t.wind)}</span></span>
       <span class="m faint" style="width:42px;font-size:9px">${t.limiter === 'NONE' ? '—' : t.limiter.slice(0, 4)}</span></button>`; }).join('');
-  return panel('Tee sheet // golf score', 'G-04', `<div class="tiny" style="margin-bottom:8px">TAP A TEE TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A 4H ROUND</div>
-    <div class="th" style="padding-bottom:4px"><span style="width:48px;font-size:8px">TEE</span><span style="flex:1;font-size:8px">SCORE /100</span><span style="width:42px;font-size:8px">RAIN</span><span style="width:50px;font-size:8px">WIND</span><span style="width:42px;font-size:8px">LIMIT</span></div>${rows}`, { key: 'gsheet', i: 0 });
+  const W = actWords();
+  return panel(W.golf ? 'Tee sheet // golf score' : `Window sheet // ${W.name} score`, 'G-04', `<div class="tiny" style="margin-bottom:8px">${W.golf ? 'TAP A TEE TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A 4H ROUND' : `TAP A START TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A ${W.hrs}H WINDOW`}</div>
+    <div class="th" style="padding-bottom:4px"><span style="width:48px;font-size:8px">${W.sw}</span><span style="flex:1;font-size:8px">SCORE /100</span><span style="width:42px;font-size:8px">RAIN</span><span style="width:50px;font-size:8px">WIND</span><span style="width:42px;font-size:8px">LIMIT</span></div>${rows}`, { key: 'gsheet', i: 0 });
 }
 function renderGolf() {
-  const course = nearCourse(), gw = course ? S.golfW : S.w, el = $('#p-golf'); pIndex = 0;
+  const el = $('#p-golf'); pIndex = 0;
+  const act = curAct(); if (!act) { el.innerHTML = ''; return; }
+  const isGolf = act.id === 'golf';
+  const sw = Prefs.activities.length > 1 ? `<div class="hs" style="gap:6px">${Prefs.activities.map(id => { const a = Activities.find(id); return a ? `<button class="actsw" data-act="${id}" aria-pressed="${id === act.id}">${esc(a.name.toUpperCase())}</button>` : ''; }).join('')}</div>` : '';
+  const course = isGolf && nearCourse(), gw = course ? S.golfW : S.w;
+  if (S.golfFor !== act.id) { S.golfFor = act.id; S.golfDay = null; S.golfSlot = null; }
+  if (!isGolf && S.golfTab === 'FLIGHT') S.golfTab = 'BRIEF';
   const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${COURSE.name.toUpperCase()}</div>
     <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
-  const generic = () => `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">GOLF // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
+  const actBanner = () => `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">${esc(act.name.toUpperCase())} // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">${act.hours}H WINDOWS · IDEAL ${Math.trunc(act.tLo)}–${Math.trunc(act.tHi)}° · ${act.windMin > 0 ? `WIND ${Math.trunc(act.windMin)}–${Math.trunc(act.windMax)} KM/H` : `WIND ≤${Math.trunc(act.windMax)} KM/H`}</div></div></div>`;
+  const generic = () => !isGolf ? actBanner() : `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">GOLF // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
     <div class="m faint" style="font-size:8px;letter-spacing:1px">GENERIC CONDITIONS FOR YOUR LOCATION · NO COURSE LOCK</div></div></div>`;
-  if (!gw) { el.innerHTML = `<div class="col">${course ? banner(false) : generic()}</div>`; return; }
+  if (!gw) { el.innerHTML = `<div class="col">${sw}${course ? banner(false) : generic()}</div>`; return; }
   const t0 = dkey(gw.current.time), days = gw.daily.slice(0, 7);
-  if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Golf.defaultDay(gw); S.golfDay = days.some(d => d.date === def) ? def : t0; }
-  const g = Golf.day(gw, S.golfDay), slot = g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
-  const chips = days.map(d => { const b = Golf.day(gw, d.date).best;
+  if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Activities.defaultDay(gw, act); S.golfDay = days.some(d => d.date === def) ? def : t0; }
+  const g = Activities.day(gw, S.golfDay, act), slot = g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
+  const chips = days.map(d => { const b = Activities.day(gw, d.date, act).best;
     return `<button class="chip gchip" data-day="${d.date}" aria-pressed="${d.date === g.date}"><span class="l">${d.date === t0 ? 'TODAY' : dayShort(d.date)}</span><span class="v" style="color:${b ? scoreColor(b.score) : 'var(--faint)'}">${b ? b.score : '--'}</span></button>`; }).join('');
   const tees = g.windows.map(t => `<button class="tee" data-tee="${t.tee}" aria-pressed="${t === slot}" style="border-color:${rgba(scoreColor(t.score), .35)}"><span class="l">${hm(t.tee)}${t === g.best ? '◆' : ''}</span><span class="v" style="color:${scoreColor(t.score)}">${t.score}</span></button>`).join('');
-  const tabs = ['BRIEF', 'SCORE', 'FLIGHT', 'SHEET'].map(t => `<button data-gtab="${t}" aria-pressed="${S.golfTab === t}">${t}</button>`).join('');
+  const tabs = ['BRIEF', 'SCORE', 'FLIGHT', 'SHEET'].filter(t => isGolf || t !== 'FLIGHT').map(t => `<button data-gtab="${t}" aria-pressed="${S.golfTab === t}">${t}</button>`).join('');
   const none = panel('No window', null, '<div class="m dim" style="font-size:11px">NO PLAYABLE DAYLIGHT WINDOW IN FORECAST RANGE</div>', { key: 'nowin', i: 0 });
   let body = '', up = null;
   if (S.golfTab === 'BRIEF') { up = uplink(g.date, slot, g); body = up.html + scoreSummary(g.date, slot, g, 1); }
   else if (S.golfTab === 'SCORE') body = slot ? breakdown(slot) : none;
   else if (S.golfTab === 'FLIGHT') body = slot ? flight(slot) : none;
   else body = teeSheet(g, slot);
-  el.innerHTML = `<div class="col" style="gap:10px">${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
+  el.innerHTML = `<div class="col" style="gap:10px">${sw}${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
   mountPanels(el);
   if (up) typeUplink($('#uplink'), up.text);
   if (S.golfTab === 'SCORE') runCalc($('#calc'));
@@ -546,7 +602,7 @@ const golfSource = () => (nearCourse() ? S.golfW || S.w : S.w);
 const sel = () => S.w ? forDay(S.w, S.coreDay || dkey(S.w.current.time)) : null;
 function toast(msg) { const t = $('#toast'); if (!msg) { t.hidden = true; return; } t.textContent = '⚠ ' + msg.toUpperCase(); t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 6000); }
 function renderTop() {
-  const atCourse = S.tab === 4 && nearCourse() && S.golfW;
+  const a0 = curAct(), atCourse = tabKey(S.tab) === 'GOLF' && a0 && a0.id === 'golf' && nearCourse() && S.golfW;
   const w = atCourse ? S.golfW : S.w, name = atCourse ? 'Albert Park' : S.place ? S.place.name : 'SKYFALL';
   if ($('#placeName').dataset.v !== name) { $('#placeName').dataset.v = name; $('#placeName').dataset.done = ''; decodeText($('#placeName'), name.toUpperCase(), 700); }
   if (!w) return;
@@ -559,7 +615,8 @@ function renderTop() {
 function visiblePages() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; return Math.max(1, Math.round($('#pager').clientWidth / pw)); }
 function renderDock() {
   const vis = visiblePages();
-  $('#dock').innerHTML = TABS.map(([l], i) => `<button data-tab="${i}" aria-current="${i >= S.tab && i < S.tab + vis}">${l}<small>0${i + 1}</small></button>`).join('');
+  const a = curAct();
+  $('#dock').innerHTML = TABS.map(([l, k], i) => [k === 'GOLF' ? (a ? a.tag : 'PLAY') : l, i]).map(([l, i]) => `<button data-tab="${i}" aria-current="${i >= S.tab && i < S.tab + vis}">${l}<small>0${i + 1}</small></button>`).join('');
 }
 function applyTheme() {
   const w = S.w; if (!w) return;
@@ -578,7 +635,7 @@ function applyTheme() {
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
 }
 /* The sky scene only lives behind CORE, fading as you swipe away (Android "coreness"). */
-function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; $('#scrim').style.opacity = f; }
+function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; $('#scrim').style.opacity = f; }
 function renderAll() { renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
 
 /* ---------- data flow ---------- */
@@ -655,24 +712,96 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').hidden = true; });
 $('#btnInstall').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch { } installEvt = null; $('#btnInstall').hidden = true; });
 $('#searchClose').addEventListener('click', () => { if (S.place) closeSearch(); });
-$('#btnMode').addEventListener('click', () => { LIGHT = !LIGHT; Store.set('theme', LIGHT ? 'light' : 'dark'); setPalette(); renderAll(); });
+
+/* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
+const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
+const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
+let stQuery = '';
+function themeCard(t) {
+  const p = LIGHT ? t.light : t.dark, on = t.id === Prefs.theme, W = 140, H = 34, r = Math.min(t.radius * .6, 16), c = 9;
+  const d = t.shape === 'chamfer' ? `M${c} .5H${W - .5}V${H - c}L${W - c} ${H - .5}H.5V${c}Z` : ['round', 'outline', 'riveted'].includes(t.shape)
+    ? `M${r + .5} .5H${W - r - .5}A${r} ${r} 0 0 1 ${W - .5} ${r + .5}V${H - r - .5}A${r} ${r} 0 0 1 ${W - r - .5} ${H - .5}H${r + .5}A${r} ${r} 0 0 1 .5 ${H - r - .5}V${r + .5}A${r} ${r} 0 0 1 ${r + .5} .5Z` : `M.5 .5H${W - .5}V${H - .5}H.5Z`;
+  const sw = [p.accent, p.accent2, p.good, p.alert].map((col, i) => `<circle cx="${12 + i * 14}" cy="${H / 2}" r="5" fill="${col}"/>`).join('');
+  return `<button class="st-theme" data-theme="${t.id}" aria-pressed="${on}" style="background:${p.bg};color:${p.ink};border-color:${rgba(p.ink, .15)}">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="${rgba(p.ink, .06)}" stroke="${t.shape === 'outline' ? p.ink : rgba(p.accent, .7)}" stroke-width="${t.shape === 'outline' ? 2 : 1}" vector-effect="non-scaling-stroke"/>${t.shape === 'bar' ? `<rect width="${W}" height="3" fill="${p.accent}"/>` : ''}</svg>
+    <svg viewBox="0 0 ${W} ${H}" style="margin-top:-34px">${sw}</svg>
+    <b style="font-family:'${t.display}';font-size:${R(20 * CATALOG.fonts[t.display][1])}px">${esc(t.name)}</b><small>${esc(t.tagline)}</small>
+    ${on ? `<em style="font-family:'${t.label}';color:${p.accent}">✓ IN USE</em>` : ''}</button>`;
+}
+function stResults() {
+  if (!stQuery.trim()) return '';
+  const res = Activities.search(stQuery).slice(0, 10);
+  if (!res.length) return `<div class="sub" style="margin:10px 4px">Nothing matches “${esc(stQuery)}”.</div>`;
+  return res.map(a => { const on = Prefs.activities.includes(a.id);
+    return `<button class="st-res" data-toggle="${a.id}"><div><b>${esc(a.name)}</b><span>${a.hours}h window · ideal ${Math.trunc(a.tLo)}–${Math.trunc(a.tHi)}°${a.windMin > 0 ? ' · needs wind' : ''}</span></div><em class="${on ? 'on' : ''}">${on ? 'Added' : 'Add'}</em></button>`; }).join('');
+}
+function row(kind, id, label, sub, on) {
+  return `<button class="st-row" role="switch" data-${kind}="${id}" aria-checked="${on}"><div><b>${esc(label)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div><i class="st-sw"></i></button>`;
+}
+function renderSettings() {
+  const el = $('#settings'), scroll = el.querySelector('.st-body')?.scrollTop || 0;
+  const mine = Prefs.activities.map((id, i) => { const a = Activities.find(id); return a ? `<span class="st-mine ${i === 0 ? 'first' : ''}" data-first="${id}">${i === 0 ? '★ ' : ''}${esc(a.name)}<i data-toggle="${id}" aria-label="Remove ${esc(a.name)}">×</i></span>` : ''; }).join('');
+  el.innerHTML = `<div class="st-head"><div style="flex:1"><div class="k">CUSTOMISE</div><h2>Settings</h2></div><button class="st-x" id="stClose" aria-label="Close settings">✕</button></div>
+  <div class="st-body">
+    <section class="st-card"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
+      <div class="st-seg"><button data-mode="dark" aria-pressed="${!LIGHT}">Dark</button><button data-mode="light" aria-pressed="${LIGHT}">Light</button></div>
+      <div class="st-themes">${CATALOG.themes.map(themeCard).join('')}</div></section>
+    <section class="st-card"><h3>Activities</h3><div class="sub">Scored windows for what you actually do. The first one is shown first.</div>
+      <div class="st-lbl">YOURS</div>${Prefs.activities.length ? `<div class="st-chips">${mine}</div>` : '<div class="sub">None yet. The activities page is hidden until you add one.</div>'}
+      ${Prefs.activities.length > 1 ? '<div class="sub" style="font-size:11px;margin-top:6px">Tap one to make it first.</div>' : ''}
+      <div class="st-lbl" style="margin-top:14px">POPULAR</div><div class="st-chips">${CATALOG.activities.filter(a => a.popular).map(a => `<button class="st-chip" data-toggle="${a.id}" aria-pressed="${Prefs.activities.includes(a.id)}">${Prefs.activities.includes(a.id) ? '✓ ' : ''}${esc(a.name)}</button>`).join('')}</div>
+      <input class="st-search" id="stSearch" type="search" autocomplete="off" placeholder="Search ${CATALOG.activities.length} activities: sailing, skiing, stargazing…" value="${esc(stQuery)}">
+      <div id="stRes">${stResults()}</div></section>
+    <section class="st-card"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
+      ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
+    <section class="st-card"><h3>Core screen</h3><div class="sub">What sits under the main gauge.</div>
+      ${CORE_LABELS.map(([id, l]) => row('corepref', id, l, '', !Prefs.hiddenCore.includes(id))).join('')}</section>
+    <section class="st-card"><h3>Effects</h3>
+      ${row('fx', 'liveSky', 'Live sky behind CORE', 'The animated weather scene', Prefs.liveSky)}${row('fx', 'boot', 'Boot sequence', 'Terminal intro when the app opens', Prefs.boot)}</section>
+    <button class="st-reset" id="stReset">Reset to defaults</button>
+    <div class="st-foot">SAVED ON THIS DEVICE. WEATHER DATA IS ALWAYS OPEN-METEO.</div>
+  </div>`;
+  el.querySelector('.st-body').scrollTop = scroll;
+}
+function openSettings() { $('#settings').hidden = false; renderSettings(); }
+function closeSettings() { $('#settings').hidden = true; }
+function prefsChanged() {
+  savePrefs(); setPalette(); computeTabs(); S.tab = Math.min(S.tab, TABS.length - 1);
+  renderAll(); goTab(S.tab, false); renderSettings();
+}
+$('#settings').addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('#stClose')) return closeSettings();
+  if (t.closest('#stReset')) { Object.assign(Prefs, JSON.parse(JSON.stringify(PDEF))); LIGHT = false; Store.set('theme', 'dark'); stQuery = ''; return prefsChanged(); }
+  const md = t.closest('[data-mode]'); if (md) { LIGHT = md.dataset.mode === 'light'; Store.set('theme', LIGHT ? 'light' : 'dark'); return prefsChanged(); }
+  const th = t.closest('[data-theme]'); if (th) { Prefs.theme = th.dataset.theme; return prefsChanged(); }
+  const tg = t.closest('[data-toggle]'); if (tg) { const id = tg.dataset.toggle; Prefs.activities = Prefs.activities.includes(id) ? Prefs.activities.filter(x => x !== id) : [...Prefs.activities, id]; return prefsChanged(); }
+  const fi = t.closest('[data-first]'); if (fi) { const id = fi.dataset.first; Prefs.activities = [id, ...Prefs.activities.filter(x => x !== id)]; S.actId = id; return prefsChanged(); }
+  const tp = t.closest('[data-tabpref]'); if (tp) { const id = tp.dataset.tabpref; if (id === 'ACT' && !Prefs.activities.length) return; Prefs.hiddenTabs = Prefs.hiddenTabs.includes(id) ? Prefs.hiddenTabs.filter(x => x !== id) : [...Prefs.hiddenTabs, id]; return prefsChanged(); }
+  const cp = t.closest('[data-corepref]'); if (cp) { const id = cp.dataset.corepref; Prefs.hiddenCore = Prefs.hiddenCore.includes(id) ? Prefs.hiddenCore.filter(x => x !== id) : [...Prefs.hiddenCore, id]; return prefsChanged(); }
+  const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; return prefsChanged(); }
+});
+$('#settings').addEventListener('input', e => { if (e.target.id === 'stSearch') { stQuery = e.target.value; $('#stRes').innerHTML = stResults(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#settings').hidden) closeSettings(); });
+$('#btnSettings').addEventListener('click', openSettings);
 $('#btnAmbient').addEventListener('click', () => { document.body.classList.add('amb'); $('#ambient').hidden = false; });
 $('#ambClose').addEventListener('click', () => { document.body.classList.remove('amb'); $('#ambient').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#search').hidden && S.place) closeSearch(); if (!$('#ambient').hidden) $('#ambClose').click(); } });
 
 const pager = $('#pager');
 const pageW = () => pager.querySelector('.page').offsetWidth || pager.clientWidth;
-function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; renderTop(); pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); if (i === 1) Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
+function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; renderTop(); pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); if (tabKey(i) === 'SCAN') Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
 $('#dock').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) goTab(+b.dataset.tab); });
-let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderTop(); renderDock(); if (i === 0) Core.replay(); if (i === 1) Scope.replay(); } }, 80); }, { passive: true });
+let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderTop(); renderDock(); if (i === 0) Core.replay(); if (tabKey(i) === 'SCAN') Scope.replay(); } }, 80); }, { passive: true });
 addEventListener('resize', () => { goTab(S.tab, false); coreness(); });
-document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goTab(Math.min(5, S.tab + 1)); if (e.key === 'ArrowLeft') goTab(Math.max(0, S.tab - 1)); });
+document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goTab(Math.min(TABS.length - 1, S.tab + 1)); if (e.key === 'ArrowLeft') goTab(Math.max(0, S.tab - 1)); });
 
 document.body.addEventListener('click', e => {
   const t = e.target;
   const day = t.closest('[data-day]');
   if (day) { const which = day.closest('[data-chips]').dataset.chips; if (which === 'core') { S.coreDay = day.dataset.day; renderCore(); } else { S.golfDay = day.dataset.day; S.golfSlot = null; renderGolf(); } return; }
-  const go = t.closest('[data-go]'); if (go) { goTab(+go.dataset.go); return; }
+  const go = t.closest('[data-go]'); if (go) { const k = go.dataset.go; if (k === 'GOLF') S.actId = Prefs.activities[0]; const gi = TABS.findIndex(x => x[1] === k); if (gi >= 0) { if (k === 'GOLF') { renderGolf(); renderDock(); } goTab(gi); } return; }
+  const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; renderGolf(); renderDock(); renderTop(); return; }
   const tee = t.closest('[data-tee]'); if (tee) { S.golfSlot = +tee.dataset.tee; renderGolf(); return; }
   const gt = t.closest('[data-gtab]'); if (gt) { S.golfTab = gt.dataset.gtab; renderGolf(); return; }
   const hd = t.closest('[data-hand]'); if (hd) { S.hand = hd.dataset.hand; Store.set('hand', S.hand); renderGolf(); return; }
@@ -687,12 +816,13 @@ document.body.addEventListener('click', e => {
 
 /* ---------- boot ---------- */
 async function boot() {
-  LIGHT = Store.get('theme', 'dark') === 'light'; setPalette();
+  LIGHT = Store.get('theme', 'dark') === 'light'; setPalette(); computeTabs();
   Scene.mount($('#sky'));
+  if (!Prefs.boot) $('#boot').classList.add('gone');
   const lines = ['SKYFALL // ATMOS-7', '> HANDSHAKE ........ OK', '> OPEN-METEO ....... LINKED', '> FAIRWAY UPLINK ... ARMED', '> HUD .............. ONLINE'];
   const bl = $('.boot-lines'); let i = 0;
-  await new Promise(res => { const step = () => { if (i >= lines.length || reduce) { bl.textContent = lines.join('\n'); return res(); } bl.textContent = lines.slice(0, ++i).join('\n'); setTimeout(step, 160); }; step(); });
-  setTimeout(() => { $('#boot').classList.add('gone'); Core.replay(); }, reduce ? 0 : 300);
+  await new Promise(res => { const step = () => { if (i >= lines.length || reduce || !Prefs.boot) { bl.textContent = lines.join('\n'); return res(); } bl.textContent = lines.slice(0, ++i).join('\n'); setTimeout(step, 160); }; step(); });
+  setTimeout(() => { $('#boot').classList.add('gone'); Core.replay(); }, reduce || !Prefs.boot ? 0 : 300);
   const h = location.hash.slice(1).toUpperCase(), ti = TABS.findIndex(t => t[0] === h);
   loadFromCache(); renderAll();
   if (ti > 0) requestAnimationFrame(() => goTab(ti, false));
