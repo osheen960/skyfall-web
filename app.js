@@ -167,6 +167,7 @@ function renderCore() {
         <div class="cf">FEELS ${deg(c.feelsLike)}</div>${tag ? `<div class="cday">${esc(tag)}</div>` : ''}</div>
       <div class="core-lh"><span style="color:${tempColor(lo)}">L ${deg(lo)}</span><span style="color:${tempColor(hi)}">H ${deg(hi)}</span></div>
     </div>
+    ${isToday && S.w.obs ? bomLine(S.w.obs) : ''}
     ${quickGrid(w, isToday)}
     ${loadout(w, isToday)}
     ${cm.html}
@@ -189,6 +190,12 @@ function typeComms(el, tx) {
     if (ci < tx[li].text.length) { ci = Math.min(tx[li].text.length, ci + 2); setTimeout(step, 28); } else { li++; ci = 0; setTimeout(step, 220); }
   };
   setTimeout(step, 900);
+}
+
+/** BoM station reading as metadata beside the Open-Meteo forecast: never used for the numbers. */
+function bomLine(o) {
+  const st = o.station.toUpperCase().replace(/[()]/g, '').replace(' AIRPORT', ' AP').slice(0, 22);
+  return `<div class="m" style="text-align:center;font-size:9px;letter-spacing:1.5px;margin-top:-6px"><span class="ac">BOM // </span><span class="dim">${esc(st)} ${o.temperature.toFixed(1)}°${o.apparent != null ? ` · FEELS ${R(o.apparent)}°` : ''} · T-${R((Date.now() - o.at) / MIN)}M</span></div>`;
 }
 
 /* ---------- 24H ---------- */
@@ -362,7 +369,7 @@ function renderData() {
     <div class="m ac" style="font-size:11px;letter-spacing:2px;margin-top:8px">${countdown}</div>`, { key: 'solar', i: 8 });
   const o = w.obs;
   $('#p-data').innerHTML = `<div class="col"><div class="tiles">${uvT}${windT}${humT}${feelsT}${precipT}${visT}${presT}${cloudT}</div>${solar}
-    <div class="footer">DATA // OPEN-METEO.COM (CC BY 4.0) · NATIONAL MODEL BLEND${o ? `\nOBS // ${esc(o.station.toUpperCase())} (${esc(o.source)}) · ${R((Date.now() - o.at) / MIN)} MIN OLD` : '\nNOW // MODEL ONLY · NO LIVE STATION IN RANGE'}\nSKYFALL ATMOS WEB</div></div>`;
+    <div class="footer">DATA // OPEN-METEO.COM (CC BY 4.0) · NATIONAL MODEL BLEND${o ? `\nBOM // ${esc(o.station.toUpperCase())} ${o.temperature.toFixed(1)}° · ${R((Date.now() - o.at) / MIN)} MIN OLD · REFERENCE ONLY` : ''}\nSKYFALL ATMOS WEB</div></div>`;
   mountPanels($('#p-data'));
 }
 
@@ -445,7 +452,7 @@ function teeSheet(g, slot) {
 function renderGolf() {
   const gw = S.golfW, el = $('#p-golf'); pIndex = 0;
   const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${COURSE.name.toUpperCase()}</div>
-    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M${S.golfW.obs ? ' · OBS ' + esc(S.golfW.obs.station.toUpperCase()) : ''}` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
   if (!gw) { el.innerHTML = `<div class="col">${banner(false)}</div>`; return; }
   const t0 = dkey(gw.current.time), days = gw.daily.slice(0, 7);
   if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Golf.defaultDay(gw); S.golfDay = days.some(d => d.date === def) ? def : t0; }
@@ -502,10 +509,9 @@ function renderTop() {
   if (!w) return;
   const lat = S.place ? S.place.lat : w.lat, lon = S.place ? S.place.lon : w.lon;
   $('#coords').textContent = `${Math.abs(lat).toFixed(3)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lon).toFixed(3)}°${lon >= 0 ? 'E' : 'W'}${S.place && S.place.gps ? ' · GPS' : ''}`;
-  const clock = new Date(localNow(w.off)).toISOString().slice(11, 19), o = w.obs, mins = R((Date.now() - w.fetchedAt) / MIN);
-  $('#dot').classList.toggle('model', !o);
-  $('#liveLabel').textContent = o ? `LIVE · ${clock} · OBS ${o.station.toUpperCase().slice(0, 22)} T-${R((Date.now() - o.at) / MIN)}M`
-    : `MODEL · ${clock} · ${mins < 1 ? 'SYNC  T+00M' : mins < 60 ? `SYNC  T+${mins}M` : `SYNC  T+${Math.floor(mins / 60)}H`}`;
+  const clock = new Date(localNow(w.off)).toISOString().slice(11, 19), mins = R((Date.now() - w.fetchedAt) / MIN);
+  $('#dot').classList.toggle('model', w.fetchedAt < slotStart());
+  $('#liveLabel').textContent = `OPEN-METEO · ${clock} · ${mins < 1 ? 'SYNC  T+00M' : mins < 60 ? `SYNC  T+${mins}M` : `SYNC  T+${Math.floor(mins / 60)}H`}`;
 }
 function visiblePages() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; return Math.max(1, Math.round($('#pager').clientWidth / pw)); }
 function renderDock() {
@@ -520,7 +526,7 @@ function applyTheme() {
   document.documentElement.style.setProperty('--ac', themeAccent(minute, rise, set, w.current.temperature, sky));
   Scene.set({ sky, minute, rise, set, wind: w.current.windSpeed, moon: moonPhase(Date.now()) });
   $('#ambTemp').textContent = deg(w.current.temperature);
-  $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + (w.obs ? ' · LIVE' : '');
+  $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + '';
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
 }
 /* The sky scene only lives behind CORE, fading as you swipe away (Android "coreness"). */
@@ -585,7 +591,7 @@ function locate(fromSearch) {
       const g = await getJSON(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&localityLanguage=en`);
       name = g.locality || g.city || name; region = [g.principalSubdivision, g.countryName].filter(Boolean).join(', ');
     } catch { }
-    setPlace({ name, region, lat: round2(lat), lon: round2(lon), gps: true });
+    setPlace({ name, region, lat: Math.round(lat * 1000) / 1000, lon: Math.round(lon * 1000) / 1000, gps: true });
   }, err => {
     $('#useGps').textContent = '◎ USE CURRENT LOCATION';
     toast(err.code === 1 ? 'Location permission denied. Search for a place instead.' : "Couldn't get your location. Search for a place instead.");
@@ -595,6 +601,11 @@ function locate(fromSearch) {
 
 /* ---------- events ---------- */
 $('#btnSearch').addEventListener('click', openSearch);
+// Chrome / Edge / Android: offer a one-tap install when the browser says the app is installable.
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#btnInstall').hidden = false; });
+addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').hidden = true; });
+$('#btnInstall').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch { } installEvt = null; $('#btnInstall').hidden = true; });
 $('#searchClose').addEventListener('click', () => { if (S.place) closeSearch(); });
 $('#btnAmbient').addEventListener('click', () => { document.body.classList.add('amb'); $('#ambient').hidden = false; });
 $('#ambClose').addEventListener('click', () => { document.body.classList.remove('amb'); $('#ambient').hidden = true; });

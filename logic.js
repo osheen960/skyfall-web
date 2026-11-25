@@ -10,7 +10,8 @@ const Store = {
 /** BoM refuses browser requests, so a GitHub Actions job republishes the same station readings as obs.json beside the site. */
 const OBS_ENABLED = true;
 const COURSE = { name: 'Albert Park Golf Course', region: 'Melbourne VIC', lat: -37.845, lon: 144.972 };
-const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR, SLOT = 15 * MIN;
+const slotStart = (now = Date.now()) => now - now % SLOT;
 /** Forecast points snap to a 0.05° (~5 km) grid, the same in the Android app, so both ask Open-Meteo for the same point. */
 const round2 = v => Math.round(v * 20) / 20;
 const placeKey = (lat, lon) => `${round2(lat).toFixed(2)},${round2(lon).toFixed(2)}`;
@@ -168,15 +169,11 @@ const Obs = {
       distanceKm: this.distanceKm(lat, lon, best.lat, best.lon),
     };
   },
-  /** Station reading replaces the model's "now"; first 3 h nudged by station-minus-model, fading to zero. */
+  /** Open-Meteo is the only source for the numbers; a fresh nearby BoM reading rides along as metadata. */
   merge(w, o) {
-    if (!w || !o || Date.now() - o.at > 75 * MIN || o.distanceKm > 50 || o.temperature == null) return w;
-    const c = w.current, delta = o.temperature - c.temperature;
-    const current = { ...c, temperature: o.temperature, feelsLike: o.apparent ?? c.feelsLike + delta, humidity: o.humidity ?? c.humidity,
-      windSpeed: o.wind ?? c.windSpeed, windDirection: o.dir ?? c.windDirection, windGusts: o.gust ?? c.windGusts, pressure: o.pressure ?? c.pressure };
-    const start = w.hourly[0] ? w.hourly[0].time : 0;
-    const hourly = w.hourly.map(h => { const k = Math.max(0, Math.min(1, 1 - (h.time - start) / HOUR / 3)); return k ? { ...h, temperature: h.temperature + delta * k, apparent: h.apparent == null ? null : h.apparent + delta * k } : h; });
-    return { ...w, current, hourly, obs: o };
+    if (!w) return w;
+    if (!o || Date.now() - o.at > 75 * MIN || o.distanceKm > 50 || o.temperature == null) return { ...w, obs: null };
+    return { ...w, obs: o };
   },
 };
 
@@ -184,7 +181,8 @@ const Obs = {
 const Repo = {
   snap(layer, lat, lon) { return Store.get(`snap:${layer}:${placeKey(lat, lon)}`, null); },
   put(layer, lat, lon, body) { Store.set(`snap:${layer}:${placeKey(lat, lon)}`, { at: Date.now(), body }); },
-  fresh(layer, lat, lon, maxAge) { const s = this.snap(layer, lat, lon); return s && Date.now() - s.at < maxAge; },
+  /** Forecasts refresh on fixed 15-minute slots (:00 :15 :30 :45), the same rule as Android, so both hold the same Open-Meteo copy. */
+  fresh(layer, lat, lon, maxAge) { const s = this.snap(layer, lat, lon); if (!s || Date.now() - s.at >= maxAge) return false; return layer !== 'fc' || s.at >= slotStart(); },
   async refresh(layer, lat, lon, maxAge, api, url, validate, headers) {
     if (this.fresh(layer, lat, lon, maxAge)) return false;
     Quota.acquire(api);
@@ -521,7 +519,7 @@ const Advisor = {
     if (aqi != null) { if (aqi <= 50) P('AIR', `Air quality good (${aqi}). Breathe freely, while stocks last.`); else P('AIR', `AQI ${aqi}. Air currently has texture. Consider limiting outdoor exertion.`, aqi > 150); }
     const gw = golfW || w, sat = Golf.day(gw, Golf.defaultDay(gw));
     if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + Caddie.banter(sat), sat.best.storm);
-    P('SYS', w.obs ? `Telemetry: ${w.obs.station} station + Open-Meteo blend. ATMOS-7 out.` : 'Telemetry: Open-Meteo best-match blend. ATMOS-7 out.');
+    P('SYS', 'Telemetry: Open-Meteo best-match blend. ATMOS-7 out.');
     return out;
   },
 };
