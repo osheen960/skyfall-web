@@ -534,6 +534,14 @@ function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 2
 function rgbToHsv([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; } return [fmod(h * 60, 360), mx ? d / mx : 0, mx]; }
 function hsvToHex(h, s, v) { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join(''); }
 function lerpHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * t).toString(16).padStart(2, '0')).join(''); }
+/* Light mode: neon is tuned for black; bright saturated colours are pulled down to read on white (same rule as Android Color.forMode). */
+let LIGHT = false;
+function M(hex) {
+  if (!LIGHT || typeof hex !== 'string' || hex[0] !== '#' || hex.length !== 7) return hex;
+  const [h, s, v] = rgbToHsv(hexToRgb(hex));
+  if (v < 0.6 || s < 0.25) return hex;
+  return hsvToHex(h, Math.min(1, s * 1.05), 0.56);
+}
 function themeAccent(minute, rise, set, tempC, sky) {
   const keys = [[rise - 60, '#5b8cff'], [rise - 10, '#ffb067'], [rise + 50, '#00e5ff'], [set - 100, '#00e5ff'], [set - 20, '#ffb547'], [set + 20, '#ff8a3d'], [set + 75, '#5b8cff']];
   let tod = '#5b8cff';
@@ -546,10 +554,10 @@ function themeAccent(minute, rise, set, tempC, sky) {
   let h = mix(a[0], b[0], 0.38); if (sky === 'STORM') h = mix(h, 215, 0.35);
   // No pinks or purples: hue blends that land in the magenta band snap to blue or orange.
   if (h > 255 && h < 345) h = h < 300 ? 225 : 20;
-  return hsvToHex(h, Math.max(a[1], b[1]) * 0.85, 1);
+  return M(hsvToHex(h, Math.max(a[1], b[1]) * 0.85, 1));
 }
 function tempColor(t) {
   const st = [[-5, '#5b7bff'], [5, '#00b3ff'], [13, '#00f0d0'], [20, '#b6ff3d'], [26, '#ffd23d'], [32, '#ff7a3d'], [40, '#ff3b30']];
-  if (isNaN(t)) return '#e6fbff'; if (t <= st[0][0]) return st[0][1]; if (t >= st[6][0]) return st[6][1];
-  const i = st.findIndex(x => x[0] > t); return lerpHex(st[i - 1][1], st[i][1], (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0]));
+  if (isNaN(t)) return LIGHT ? '#0b1a28' : '#e6fbff'; if (t <= st[0][0]) return M(st[0][1]); if (t >= st[6][0]) return M(st[6][1]);
+  const i = st.findIndex(x => x[0] > t); return M(lerpHex(st[i - 1][1], st[i][1], (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0])));
 }

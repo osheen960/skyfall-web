@@ -16,6 +16,20 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-off
 .ink{color:var(--ink)}.dim{color:var(--dim)}.faint{color:var(--faint)}.ac{color:var(--ac)}.amber{color:var(--amber)}.alert{color:var(--alert)}.good{color:var(--good)}
 .up{text-transform:uppercase}
 
+/* ---- light mode (matches Android Mode.light) ---- */
+body.light{--void:#eef3f7;--ink:#0b1a28;--dim:rgba(11,26,40,.66);--faint:rgba(11,26,40,.4);--amber:#8f5f14;--alert:#8f1c2c;--good:#158f4f;color-scheme:light}
+body.light #scrim{background:linear-gradient(rgba(255,255,255,.72),rgba(255,255,255,.55),rgba(255,255,255,.85))}
+body.light #boot{background:rgba(238,243,247,.96)}
+body.light #toast{background:color-mix(in srgb,var(--alert) 10%,#eef3f7)}
+body.light #dock{background:rgba(238,243,247,.88)}
+body.light .panel>svg.frame .fill{fill:rgba(255,255,255,.62)}
+body.light .chip,body.light .tee{background:rgba(255,255,255,.25)}
+body.light .overlay{background:rgba(238,243,247,.95)}
+body.light .ambient{background:transparent;--ink:#e6fbff;--dim:rgba(230,251,255,.58)}
+.sq svg .solid{fill:var(--ac);stroke:none}
+#btnMode svg{transition:transform .5s}
+body.light #btnMode svg{transform:rotate(180deg)}
+
 /* ---- backdrop ---- */
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;transition:opacity .35s}
 #grid{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(transparent 0 calc(100% - 1px),color-mix(in srgb,var(--ac) 6%,transparent) 0) 0 0/100% 34px,linear-gradient(90deg,transparent 0 calc(100% - 1px),color-mix(in srgb,var(--ac) 4%,transparent) 0) 0 0/34px 100%}

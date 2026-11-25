@@ -6,7 +6,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS = [['CORE', 'CORE'], ['24H', 'SCAN'], ['10D', 'TRAJ'], ['DATA', 'DATA'], ['GOLF', 'GOLF'], ['AIR', 'AIR']];
 const GOOGLE_KEY = /^AIza[0-9A-Za-z_-]{35}$/;
-const INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff3b30', GOOD = '#3dff9a';
+let INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff3b30', GOOD = '#3dff9a', VOID = '#020409';
+function setPalette() {
+  document.body.classList.toggle('light', LIGHT);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', LIGHT ? '#eef3f7' : '#020409');
+  INK = LIGHT ? '#0b1a28' : '#e6fbff'; VOID = LIGHT ? '#eef3f7' : '#020409';
+  AMBER = M('#ffb547'); ALERT = M('#ff4d6a'); MAGENTA = M('#ff3b30'); GOOD = M('#3dff9a');
+}
 const AC = () => getComputedStyle(document.documentElement).getPropertyValue('--ac').trim() || '#00e5ff';
 
 const S = {
@@ -21,11 +27,11 @@ const ddmm = date => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 const dayShort = date => `${DOW[dow(T(date + 'T00:00'))]} ${date.slice(8, 10)}`;
 const rgba = (hex, a) => { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; };
 function scoreColor(s) {
-  if (s >= 70) return lerpHex('#b6ff3d', '#3dff9a', Math.max(0, Math.min(1, (s - 70) / 30)));
-  if (s >= 40) return lerpHex('#ff9a3d', '#b6ff3d', (s - 40) / 30);
-  return lerpHex(ALERT, '#ff9a3d', Math.max(0, s) / 40);
+  if (s >= 70) return lerpHex(M('#b6ff3d'), M('#3dff9a'), Math.max(0, Math.min(1, (s - 70) / 30)));
+  if (s >= 40) return lerpHex(M('#ff9a3d'), M('#b6ff3d'), (s - 40) / 30);
+  return lerpHex(ALERT, M('#ff9a3d'), Math.max(0, s) / 40);
 }
-const pollenColor = v => v < 1.5 ? GOOD : v < 2.5 ? '#b6ff3d' : v < 3.5 ? '#ffd23d' : v < 4.5 ? '#ff7a3d' : ALERT;
+const pollenColor = v => v < 1.5 ? GOOD : v < 2.5 ? M('#b6ff3d') : v < 3.5 ? M('#ffd23d') : v < 4.5 ? M('#ff7a3d') : ALERT;
 const seen = new Set();
 let pIndex = 0;
 function panel(title, code, body, opts = {}) {
@@ -77,7 +83,7 @@ function icon(code, day = true, size = 18, tint) {
   const g = (d, col, extra = '') => `<path class="glow" d="${d}" stroke="${col}" stroke-width="4.6" fill="none" ${extra}/><path d="${d}" stroke="${col}" stroke-width="1.6" fill="none" ${extra}/>`;
   const sunD = 'M12 7.4a4.6 4.6 0 1 0 .01 0z', rays = [0, 45, 90, 135, 180, 225, 270, 315].map(a => { const r1 = 6.8, r2 = 9.2, t = a * Math.PI / 180; return `M${12 + r1 * Math.cos(t)} ${12 + r1 * Math.sin(t)}L${12 + r2 * Math.cos(t)} ${12 + r2 * Math.sin(t)}`; }).join('');
   const sun = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g(sunD, AMBER)}<g class="rays">${g(rays, AMBER)}</g></g>`;
-  const moon = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g('M15 4.6a7.6 7.6 0 1 0 4.6 12.6A6.2 6.2 0 0 1 15 4.6z', '#cfe3ff')}</g>`;
+  const moon = (s = 1, dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy}) scale(${s})">${g('M15 4.6a7.6 7.6 0 1 0 4.6 12.6A6.2 6.2 0 0 1 15 4.6z', M('#cfe3ff'))}</g>`;
   const cloudD = (y = 0) => `M6.6 ${17.6 + y}h10.6a3.6 3.6 0 0 0 .3-7.2 5.4 5.4 0 0 0-10.3-1.2 4.2 4.2 0 0 0-.6 8.4z`;
   let b;
   switch (sky) {
@@ -85,9 +91,9 @@ function icon(code, day = true, size = 18, tint) {
     case 'PARTLY': b = (day ? sun(.62, -1, -1) : moon(.62, -1, -1)) + `<g class="drift">${g(cloudD(1.5), ac)}</g>`; break;
     case 'CLOUDY': b = `<g class="drift">${g(cloudD(), ac)}</g>`; break;
     case 'FOG': b = `<g class="drift">${g(cloudD(-3), ac)}</g>${g('M5 19h14M7 22h10', ac)}`; break;
-    case 'DRIZZLE': case 'RAIN': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g>${[8.5, 12, 15.5].map((x, i) => `<g class="drop" style="animation-delay:${i * .33}s">${g(`M${x} 17.5l-1 ${sky === 'RAIN' ? 4 : 2.4}`, '#7fd4ff')}</g>`).join('')}`; break;
+    case 'DRIZZLE': case 'RAIN': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g>${[8.5, 12, 15.5].map((x, i) => `<g class="drop" style="animation-delay:${i * .33}s">${g(`M${x} 17.5l-1 ${sky === 'RAIN' ? 4 : 2.4}`, M('#7fd4ff'))}</g>`).join('')}`; break;
     case 'SNOW': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g>${[8.5, 12, 15.5].map((x, i) => `<g class="drop" style="animation-delay:${i * .4}s"><circle cx="${x}" cy="19.5" r="1.1" fill="${INK}"/></g>`).join('')}`; break;
-    case 'STORM': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g><g class="bolt">${g('M12.6 15.2l-2.6 4.2h3l-1.4 3.6', '#ffd23d')}</g>`; break;
+    case 'STORM': b = `<g class="drift">${g(cloudD(-3.5), ac)}</g><g class="bolt">${g('M12.6 15.2l-2.6 4.2h3l-1.4 3.6', M('#ffd23d'))}</g>`; break;
   }
   return `<svg class="ico" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
 }
@@ -123,7 +129,7 @@ function quickGrid(w, isToday) {
   const pollen = S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w), pl = pollenFor(w, pollen);
   const cells = [
     [`WIND ${compass16(c.windDirection)}`, `${R(c.windSpeed)} KM/H`, INK],
-    [isToday ? 'RAIN 24H' : 'RAIN 06–06', `${rainMax}%`, rainMax >= 50 ? '#00e5ff' : INK],
+    [isToday ? 'RAIN 24H' : 'RAIN 06–06', `${rainMax}%`, rainMax >= 50 ? M('#00e5ff') : INK],
     ['UV PEAK', `${R(uv)}`, uv >= 8 ? ALERT : INK, uv >= 8],
     ['HUMIDITY', `${c.humidity ?? '--'}%`, INK],
     [`GOLF ${DOW[dow(T(gdate + 'T00:00'))]} ›`, gd.best ? `${gd.best.score} · ${hm(gd.best.tee)}` : 'N/A', gd.best ? scoreColor(gd.best.score) : 'var(--dim)', false, 4],
@@ -256,7 +262,7 @@ const Scope = (() => {
     x.lineCap = 'round'; x.strokeStyle = grad;
     x.globalAlpha = .18; x.lineWidth = 10; x.stroke(path); x.globalAlpha = .4; x.lineWidth = 4; x.stroke(path); x.globalAlpha = 1; x.strokeStyle = INK; x.lineWidth = 1.4; x.stroke(path);
     x.font = '600 15px Rajdhani, sans-serif'; x.textAlign = 'center';
-    pts.forEach(([px, py], i) => { x.fillStyle = '#020409'; x.fillRect(px - 2.5, py - 2.5, 5, 5); x.strokeStyle = tempColor(hours[i].temperature); x.lineWidth = 1.5; x.strokeRect(px - 2.5, py - 2.5, 5, 5); x.fillStyle = INK; x.fillText(deg(hours[i].temperature), px, py - 8); });
+    pts.forEach(([px, py], i) => { x.fillStyle = VOID; x.fillRect(px - 2.5, py - 2.5, 5, 5); x.strokeStyle = tempColor(hours[i].temperature); x.lineWidth = 1.5; x.strokeRect(px - 2.5, py - 2.5, 5, 5); x.fillStyle = INK; x.fillText(deg(hours[i].temperature), px, py - 8); });
     x.restore();
     x.fillStyle = rgba(ac, .08); x.fillRect(0, 0, step, H);
     const sx = reduce ? -100 : (((now / 1000) * .12) % 1) * W;
@@ -305,7 +311,7 @@ function renderData() {
   const tile = (title, code, body, i) => panel(title, code, body, { key: 'tile-' + code, i });
   // UV
   const uv = now.uv || 0, uvLevel = uv < 3 ? 'LOW' : uv < 6 ? 'MODERATE' : uv < 8 ? 'HIGH' : uv < 11 ? 'V.HIGH' : 'EXTREME';
-  const uvCol = uv < 3 ? GOOD : uv < 6 ? '#ffe14d' : uv < 8 ? '#ff9a3d' : uv < 11 ? ALERT : MAGENTA, uvF = Math.max(0, Math.min(1, uv / 11));
+  const uvCol = uv < 3 ? GOOD : uv < 6 ? M('#ffe14d') : uv < 8 ? M('#ff9a3d') : uv < 11 ? ALERT : MAGENTA, uvF = Math.max(0, Math.min(1, uv / 11));
   const uvSegs = Array.from({ length: 22 }, (_, k) => { const a0 = 180 + 180 * k / 22 + 1, a1 = a0 + 180 / 22 - 2, r = 54, cx = 60, cy = 62, p = a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)];
     const [x0, y0] = p(a0), [x1, y1] = p(a1), on = k < Math.round(22 * uvF);
     return `<path d="M${x0} ${y0}A${r} ${r} 0 0 1 ${x1} ${y1}" stroke="${on ? lerpHex(GOOD, MAGENTA, k / 22) : rgba(ac, .1)}" stroke-width="5" fill="none" ${on ? `style="opacity:0;animation:pbody .15s ${k * 45}ms forwards"` : ''}/>`; }).join('');
@@ -362,7 +368,7 @@ function renderData() {
   const orbit = Array.from({ length: 81 }, (_, k) => at(k / 80).map(v => v.toFixed(1)).join(' ')).join(' L');
   const doneN = Math.max(1, Math.round(80 * f)), donePath = Array.from({ length: doneN + 1 }, (_, k) => at(f * k / doneN).map(v => v.toFixed(1)).join(' ')).join(' L');
   const [sx, sy] = at(f);
-  const solar = panel('Solar orbit', 'T-09', `<div style="display:flex;justify-content:space-between">${readout('Rise', hm(today.sunrise), AMBER)}${readout('Daylight', dur(total))}${readout('Set', hm(today.sunset), '#ff7a3d', 'text-align:right')}</div>
+  const solar = panel('Solar orbit', 'T-09', `<div style="display:flex;justify-content:space-between">${readout('Rise', hm(today.sunrise), AMBER)}${readout('Daylight', dur(total))}${readout('Set', hm(today.sunset), M('#ff7a3d'), 'text-align:right')}</div>
     <svg class="orbit" viewBox="0 0 ${OW} ${OH}" style="width:100%;margin-top:10px;overflow:visible"><defs><linearGradient id="og"><stop offset="0" stop-color="#ff7a3d"/><stop offset="1" stop-color="${AMBER}"/></linearGradient></defs>
       <path class="dash" d="M${orbit}" fill="none" stroke="${rgba(ac, .25)}" stroke-dasharray="4 6"/>
       <path d="M${donePath}" fill="none" stroke="url(#og)" stroke-width="2" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" style="animation:trace 2s cubic-bezier(.4,0,.2,1) forwards"/>
@@ -518,7 +524,7 @@ function renderAir() {
     ${asthma ? `<div class="m alert" style="font-size:10px;letter-spacing:1px;margin:6px 0">⚠ THUNDERSTORM ASTHMA CONDITIONS ${dayShort(asthma.date)} · HAVE RELIEVER READY</div>` : ''}
     <div style="margin-top:8px">${pollen.days.map(d => `<div style="display:flex;align-items:center;height:28px"><span class="m dim" style="width:64px;font-size:10px">${d.date === t0 ? 'TODAY' : dayShort(d.date)}</span>${pollenBar('GRS', d.grass)}${pollen.source === 'GOOGLE' ? '<span style="width:10px"></span>' + pollenBar('TRE', d.tree) : ''}</div>`).join('')}</div>
     ${pollen.note ? `<div class="tiny" style="margin-top:6px">${esc(pollen.note.toUpperCase())}</div>` : ''}`, { key: 'pollen', i: 0 });
-  const q = S.air, aqi = q ? q.usAqi : null, col = aqi == null ? INK : aqi <= 50 ? GOOD : aqi <= 100 ? '#ffd23d' : aqi <= 150 ? '#ff7a3d' : ALERT;
+  const q = S.air, aqi = q ? q.usAqi : null, col = aqi == null ? INK : aqi <= 50 ? GOOD : aqi <= 100 ? M('#ffd23d') : aqi <= 150 ? M('#ff7a3d') : ALERT;
   const aq = panel('Air quality', 'US AQI', aqi == null ? '<div class="m dim" style="font-size:11px">ACQUIRING…</div>' : `
     <div style="display:flex;align-items:flex-end"><span class="d" style="font-weight:300;font-size:48px;line-height:1;color:${col}" data-decode="${aqi}">${aqi}</span><span class="m" style="font-size:12px;letter-spacing:2px;margin:0 0 8px 12px;color:${col}">${Air.aqi(aqi)}</span></div>
     <div style="display:flex;margin-top:8px">${readout('PM2.5', q.pm25 != null ? f1(q.pm25) : '--', INK, 'flex:1')}${readout('PM10', q.pm10 != null ? f1(q.pm10) : '--', INK, 'flex:1')}${readout('Ozone', q.ozone != null ? R(q.ozone) : '--', INK, 'flex:1')}</div>
@@ -649,6 +655,7 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').hidden = true; });
 $('#btnInstall').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch { } installEvt = null; $('#btnInstall').hidden = true; });
 $('#searchClose').addEventListener('click', () => { if (S.place) closeSearch(); });
+$('#btnMode').addEventListener('click', () => { LIGHT = !LIGHT; Store.set('theme', LIGHT ? 'light' : 'dark'); setPalette(); renderAll(); });
 $('#btnAmbient').addEventListener('click', () => { document.body.classList.add('amb'); $('#ambient').hidden = false; });
 $('#ambClose').addEventListener('click', () => { document.body.classList.remove('amb'); $('#ambient').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#search').hidden && S.place) closeSearch(); if (!$('#ambient').hidden) $('#ambClose').click(); } });
@@ -680,6 +687,7 @@ document.body.addEventListener('click', e => {
 
 /* ---------- boot ---------- */
 async function boot() {
+  LIGHT = Store.get('theme', 'dark') === 'light'; setPalette();
   Scene.mount($('#sky'));
   const lines = ['SKYFALL // ATMOS-7', '> HANDSHAKE ........ OK', '> OPEN-METEO ....... LINKED', '> FAIRWAY UPLINK ... ARMED', '> HUD .............. ONLINE'];
   const bl = $('.boot-lines'); let i = 0;
