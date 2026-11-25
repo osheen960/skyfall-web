@@ -422,7 +422,7 @@ const Caddie = {
 
 /* ---------- loadout + bulletin ---------- */
 const Gear = [['SHELL', 'Rain jacket'], ['COAT', 'Coat'], ['LAYERS', 'Layers'], ['TSHIRT', 'T-shirt'], ['BOOTS', 'Boots'], ['SANDALS', 'Open shoes'],
-  ['SNEAKERS', 'Closed shoes'], ['SUNSCREEN', 'SPF50+'], ['SUNGLASSES', 'Sunglasses'], ['HAT', 'Hat'], ['GLOVES', 'Gloves'], ['MASK', 'Mask']];
+  ['SNEAKERS', 'Closed shoes'], ['SUNSCREEN', 'SPF50+'], ['SUNGLASSES', 'Sunglasses'], ['HAT', 'Hat / shade'], ['GLOVES', 'Gloves'], ['MASK', 'Mask']];
 
 function aqiFor(w, air) {
   if (!air) return null;
@@ -466,7 +466,7 @@ const Advisor = {
       A('SUNSCREEN', 'SPF50+', `UV ${R(uv)}${win}`, uv >= 8 ? 9 : 6, [`UV ${R(uv)}. The sun wants your skin. Don't let it win.`, 'Burn now, regret later. Or both, efficiently.', 'Reapply every 2h. Yes, really. No, your tan is not a personality.']);
     }
     if (sunny && uv >= 3) A('SUNGLASSES', 'Sunglasses', 'Direct sun', 5, ['Squinting ages you. So does this forecast.', 'Look mysterious. Or just see.']);
-    if (uv >= 6) A('HAT', 'Wide-brim hat', `UV ${R(uv)} — peak 11–3`, 6, ['Bucket hat: legally a personality.', "Protect the scalp. It's been through enough."]);
+    if (uv >= 6) A('HAT', 'Hat or shade', `UV ${R(uv)} — cover up 11–3`, 6, ['Hat, shade or a strategic tree. Pick one.', 'No hat? Walk the shady side like a vampire.', 'Cover the scalp or dodge the sun 11–3. Your call, your sunburn.']);
     if (feelMin <= 7) A('GLOVES', 'Gloves', `Feels ${R(feelMin)}° in daylight`, 5, ['Fingers are non-refundable.', `${R(feelMin)}°. Your hands have filed a complaint.`]);
     const aqi = aqiFor(w, air);
     if (aqi != null && aqi > 100) A('MASK', 'P2 mask', `AQI ${aqi}`, 8, ['The air has texture today. Gross.', 'Breathing: now with extra chunks.']);

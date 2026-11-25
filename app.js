@@ -637,6 +637,10 @@ async function boot() {
   if (!S.place) { locate(false); openSearch(); } else refresh(false);
   setInterval(() => { if (!document.hidden) { renderTop(); applyTheme(); refresh(false); } }, 60000);
   setInterval(() => { if (!document.hidden) renderTop(); }, 1000);
+  // Re-run the core gauge load every half hour (on the :00 and :30), like a fresh reading coming in.
+  const half = 30 * MIN, nextHalf = () => half - Date.now() % half + 200;
+  const halfHour = () => { if (!document.hidden && S.tab === 0) Core.replay(); setTimeout(halfHour, nextHalf()); };
+  setTimeout(halfHour, nextHalf());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
 }
