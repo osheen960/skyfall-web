@@ -452,27 +452,32 @@ const Advisor = {
     const wet = hours.find(h => (h.pop || 0) >= 40 || h.precip >= 0.3);
     const swing = tMax - tMin, out = [];
     const A = (gear, title, reason, pri, quips) => out.push({ gear, title, reason, pri, quips });
-    if (wet) A('SHELL', gust >= 45 ? 'Storm shell' : 'Rain jacket', `${pop}% from ${hm(wet.time)} · ${f1(mm)} mm`, 9,
-      [`${pop}% rain. The sky has opinions and they're wet.`, `${f1(mm)} mm incoming. Waterproof or water-logged: pick one.`, gust >= 45 ? `Gusts ${R(gust)}. Umbrellas go to die today.` : 'Hood up. Dignity down.']);
-    if (tMax <= 11) A('COAT', 'Heavy coat', `Peaks at ${R(tMax)}°`, 8, [`${R(tMax)}° is the high. The HIGH.`, 'Dress like a burrito. Survive like one.', 'Fashion is dead. Warmth lives.']);
-    else if (swing >= 9) A('LAYERS', 'Layers', `${R(tMin)}°→${R(tMax)}° swing`, 7, [`${R(swing)}° swing. Melbourne is speedrunning seasons again.`, 'Onion mode: peel as the day betrays you.', 'Morning you and afternoon you want different outfits. Both are right.']);
-    else if (tMax <= 17) A('LAYERS', 'Jacket', `Tops out at ${R(tMax)}°`, 6, [`${R(tMax)}°. Not cold, just disappointing.`, 'Future you says thanks. Present you whinges.']);
-    else if (tMax <= 22) A('LAYERS', 'Light layer', `${R(tMin)}–${R(tMax)}°`, 4, ['Mild. Suspiciously mild.', 'A light layer, in case the sky gets ideas.']);
-    else if (tMax <= 28) A('TSHIRT', 'T-shirt', `Up to ${R(tMax)}°`, 4, [`${R(tMax)}°. Arms out. Dignity optional.`, "T-shirt weather. Pretend you're on holiday."]);
-    else A('TSHIRT', 'Breathable', `Up to ${R(tMax)}°`, 6, [`${R(tMax)}°. Wear less. Sweat anyway.`, 'Linen or death. Mostly linen.']);
-    if (snow) A('BOOTS', 'Insulated boots', 'Snow forecast', 8, ['Frostbite is not a vibe.', 'Toes are non-refundable.']);
-    else if (mm >= 2 || pop >= 60) A('BOOTS', 'Waterproof boots', `${f1(mm)} mm in daylight`, 7, ['Wet socks are a war crime.', `${f1(mm)} mm of puddle-based trauma ahead.`]);
-    else if (tMax >= 24 && !wet) A('SANDALS', 'Open shoes', `Dry, ${R(tMax)}°`, 3, ['Toes out. Judgement incoming.', `Sandals: because socks are a cry for help at ${R(tMax)}°.`]);
-    else A('SNEAKERS', 'Closed shoes', wet ? 'Damp patches' : 'Standard issue', 2, ['Boring. Correct.', 'Sensible shoes. Thrilling.']);
-    if (uv >= 3) {
-      const win = uvH.length ? ` · ${hm(uvH[0].time)}–${hm(uvH[uvH.length - 1].time + HOUR)}` : '';
-      A('SUNSCREEN', 'SPF50+', `UV ${R(uv)}${win}`, uv >= 8 ? 9 : 6, [`UV ${R(uv)}. The sun wants your skin. Don't let it win.`, 'Burn now, regret later. Or both, efficiently.', 'Reapply every 2h. Yes, really. No, your tan is not a personality.']);
-    }
-    if (sunny && uv >= 3) A('SUNGLASSES', 'Sunglasses', 'Direct sun', 5, ['Squinting ages you. So does this forecast.', 'Look mysterious. Or just see.']);
-    if (uv >= 6) A('HAT', 'Hat or shade', `UV ${R(uv)} — cover up 11–3`, 6, ['Hat, shade or a strategic tree. Pick one.', 'No hat? Walk the shady side like a vampire.', 'Cover the scalp or dodge the sun 11–3. Your call, your sunburn.']);
-    if (feelMin <= 7) A('GLOVES', 'Gloves', `Feels ${R(feelMin)}° in daylight`, 5, ['Fingers are non-refundable.', `${R(feelMin)}°. Your hands have filed a complaint.`]);
+    // Quips are written from the day's actual numbers; the UI shows one per day (same rule as Android).
+    const wetT = wet ? hm(wet.time) : '', uvStart = uvH.length ? hm(uvH[0].time) : '11:00', uvEnd = uvH.length ? hm(uvH[uvH.length - 1].time + HOUR) : '15:00';
+    const L = (...q) => q.filter(Boolean);
+    if (wet) A('SHELL', gust >= 45 ? 'Storm shell' : 'Rain jacket', `${pop}% from ${wetT} · ${f1(mm)} mm`, 9, L(
+      `${pop}% rain from ${wetT}. The sky has opinions and they're wet.`,
+      `${f1(mm)} mm by sunset. Waterproof or water-logged: pick one.`,
+      `Rain lands around ${wetT}. Plan your heroic sprint accordingly.`,
+      gust >= 45 ? `Gusts ${R(gust)} km/h. Umbrellas go to die today.` : `Hood up from ${wetT}. Dignity down.`,
+      mm < 1 && `Only ${f1(mm)} mm, but it'll find your collar anyway.`,
+      mm >= 5 && `${f1(mm)} mm. That's not rain, that's a subscription.`));
+    if (tMax <= 11) A('COAT', 'Heavy coat', `Peaks at ${R(tMax)}°`, 8, L(`${R(tMax)}° is the high. The HIGH.`, `Feels like ${R(feelMin)}° out there. Dress like a burrito.`, `${R(tMin)}° to start. Fashion is dead. Warmth lives.`, gust >= 40 && `Gusts ${R(gust)} make ${R(tMax)}° feel personal.`));
+    else if (swing >= 9) A('LAYERS', 'Layers', `${R(tMin)}°→${R(tMax)}° swing`, 7, L(`${R(tMin)}° to ${R(tMax)}°: Melbourne is speedrunning seasons again.`, `${R(swing)}° swing. Onion mode: peel as the day betrays you.`, `Cold ${R(tMin)}° start, ${R(tMax)}° finish. Morning you and afternoon you disagree.`));
+    else if (tMax <= 17) A('LAYERS', 'Jacket', `Tops out at ${R(tMax)}°`, 6, L(`${R(tMax)}°. Not cold, just disappointing.`, `Tops out at ${R(tMax)}°. Future you says thanks.`, gust >= 35 ? `${R(gust)} km/h gusts on a ${R(tMax)}° day. Zip it.` : `${R(tMin)}° mornings don't care about your plans.`));
+    else if (tMax <= 22) A('LAYERS', 'Light layer', `${R(tMin)}–${R(tMax)}°`, 4, L(`${R(tMin)}–${R(tMax)}°. Mild. Suspiciously mild.`, `A light layer for the ${R(tMin)}° bits.`, pop >= 30 ? `${pop}% rain chance. Pick a layer that can take a sprinkle.` : `${R(tMax)}° peak. Tie it round your waist by lunch.`));
+    else if (tMax <= 28) A('TSHIRT', 'T-shirt', `Up to ${R(tMax)}°`, 4, L(`${R(tMax)}°. Arms out. Dignity optional.`, `T-shirt weather at ${R(tMax)}°. Pretend you're on holiday.`, uv >= 8 ? `${R(tMax)}° and UV ${R(uv)}. T-shirt yes, sunscreen absolutely.` : `${R(tMin)}° early, ${R(tMax)}° later. The sleeves can wait.`));
+    else A('TSHIRT', 'Breathable', `Up to ${R(tMax)}°`, 6, L(`${R(tMax)}°. Wear less. Sweat anyway.`, `Linen or death at ${R(tMax)}°. Mostly linen.`, `${R(tMax)}° peak. Your shirt will be a sponge by 3pm.`));
+    if (snow) A('BOOTS', 'Insulated boots', 'Snow forecast', 8, L('Snow. Toes are non-refundable.', `Frostbite is not a vibe at ${R(tMin)}°.`));
+    else if (mm >= 2 || pop >= 60) A('BOOTS', 'Waterproof boots', `${f1(mm)} mm in daylight`, 7, L(`${f1(mm)} mm of puddle-based trauma ahead.`, `Wet socks are a war crime. ${pop}% says they're coming.`, wetT ? `Rain from ${wetT}. Boots now, regret never.` : 'Boots now, regret never.'));
+    else if (tMax >= 24 && !wet) A('SANDALS', 'Open shoes', `Dry, ${R(tMax)}°`, 3, L(`Dry and ${R(tMax)}°. Toes out. Judgement incoming.`, `Socks at ${R(tMax)}° are a cry for help.`, `${R(tMax)}° and no rain. Your feet have earned this.`));
+    else A('SNEAKERS', 'Closed shoes', wet ? 'Damp patches' : 'Standard issue', 2, L(wet ? `Damp patches about (${pop}%). Closed shoes, open mind.` : 'Standard issue. Boring. Correct.', `${R(tMin)}–${R(tMax)}° and nothing dramatic. Sensible shoes. Thrilling.`, `Nothing to dodge at ${R(tMax)}°. Just walk normally, for once.`));
+    if (uv >= 3) A('SUNSCREEN', 'SPF50+', `UV ${R(uv)}${uvH.length ? ` · ${uvStart}–${uvEnd}` : ''}`, uv >= 8 ? 9 : 6, L(`UV ${R(uv)} from ${uvStart}. The sun wants your skin.`, `UV ${R(uv)} until ${uvEnd}. Burn now, regret later.`, `Reapply every 2h, ${uvStart}–${uvEnd}. Your tan is not a personality.`, uv >= 11 && `UV ${R(uv)}: extreme. Shade is a lifestyle today.`));
+    if (sunny && uv >= 3) A('SUNGLASSES', 'Sunglasses', 'Direct sun', 5, L(`Direct sun at ${R(tMax)}°. Squinting ages you.`, `Glare from ${uvStart} to ${uvEnd}. Look mysterious, or just see.`, pop >= 30 ? 'Sun between the showers. Shades on standby.' : 'Clear-ish and bright. Eyes deserve better.'));
+    if (uv >= 6) A('HAT', 'Hat or shade', `UV ${R(uv)} — cover up 11–3`, 6, L(`UV ${R(uv)}: hat, shade or a strategic tree.`, `No hat? Walk the shady side like a vampire until ${uvEnd}.`, `Peak UV ${R(uv)} around midday. Cover the scalp or dodge it.`));
+    if (feelMin <= 7) A('GLOVES', 'Gloves', `Feels ${R(feelMin)}° in daylight`, 5, L(`Feels ${R(feelMin)}°. Your hands have filed a complaint.`, `Fingers are non-refundable at ${R(feelMin)}°.`, gust >= 30 ? `${R(gust)} km/h wind on your knuckles. Gloves.` : 'Cold hands, colder coffee. Gloves.'));
     const aqi = aqiFor(w, air);
-    if (aqi != null && aqi > 100) A('MASK', 'P2 mask', `AQI ${aqi}`, 8, ['The air has texture today. Gross.', 'Breathing: now with extra chunks.']);
+    if (aqi != null && aqi > 100) A('MASK', 'P2 mask', `AQI ${aqi}`, 8, [`AQI ${aqi}. The air has texture today. Gross.`, `AQI ${aqi}: breathing, now with extra chunks.`]);
     return { date, next, items: out.sort((a, b) => b.pri - a.pri) };
   },
 
