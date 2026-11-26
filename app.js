@@ -185,13 +185,13 @@ function loadout(w, isToday) {
   const title = !isToday ? `Loadout // ${DOW[dow(T(dkey(w.current.time) + 'T00:00'))].charAt(0) + DOW[dow(T(dkey(w.current.time) + 'T00:00'))].slice(1).toLowerCase()} daylight` : lo.next ? 'Loadout // tomorrow, daylight' : 'Loadout // daylight hours';
   const cells = Gear.map(([g, name]) => {
     const a = items[g];
-    if (!a) return `<div class="gc" style="border-color:rgba(var(--inkrgb),.06)"><svg viewBox="0 0 24 24" width="22" height="22" style="stroke:rgba(var(--inkrgb),.2)" stroke-width="1.4"><path d="${GEAR[g]}"/></svg><div class="n" style="color:rgba(var(--inkrgb),.3)">${esc(name.toUpperCase())}</div><div class="x">NOT NEEDED</div></div>`;
+    if (!a) return `<div class="gc" style="border-color:rgba(var(--inkrgb),.06)"><svg viewBox="0 0 24 24" width="24" height="24" style="stroke:rgba(var(--inkrgb),.2)" stroke-width="1.4"><path d="${GEAR[g]}"/></svg><div class="n" style="color:rgba(var(--inkrgb),.3)">${esc(name.toUpperCase())}</div><div class="x">NOT NEEDED</div></div>`;
     const hot = a.pri >= 8, col = hot ? AMBER : ac;
     // One quip per item per day, written from that day's numbers (same pick as Android).
     const ord = { SHELL: 1, COAT: 2, LAYERS: 3, TSHIRT: 4, BOOTS: 5, SANDALS: 6, SNEAKERS: 7, SUNGLASSES: 8, SUNSCREEN: 9, HAT: 10, MASK: 11, GLOVES: 14 }[g] || 0;
     const k = `${lo.date}:${g}`; quipCache[k] = a.quips[fmod(Math.floor(T(lo.date + 'T00:00') / DAY) + ord * 3, a.quips.length)];
     return `<div class="gc on" style="border-color:${rgba(col, hot ? .7 : .35)};background:${rgba(col, .06)}">
-      <svg viewBox="0 0 24 24" width="28" height="28" stroke="${col}" style="animation-delay:-${Gear.findIndex(x => x[0] === g) * .4}s"><path d="${GEAR[g]}" stroke-width="4.6" opacity=".25"/><path d="${GEAR[g]}" stroke-width="1.5"/></svg>
+      <svg viewBox="0 0 24 24" width="32" height="32" stroke="${col}" style="animation-delay:-${Gear.findIndex(x => x[0] === g) * .4}s"><path d="${GEAR[g]}" stroke-width="4.6" opacity=".25"/><path d="${GEAR[g]}" stroke-width="1.5"/></svg>
       <div class="n ink">${esc(a.title.toUpperCase())}</div><div class="r">${esc(a.reason)}</div><div class="q" style="color:${rgba(col, .9)}">${esc(quipCache[k])}</div></div>`;
   }).join('');
   return panel(title, `${lo.items.length}/${Gear.length} ON`, `<div class="lo">${cells}</div>`, { key: 'loadout', i: 1 });
