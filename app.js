@@ -616,7 +616,7 @@ function visiblePages() { const pw = $('#pager').querySelector('.page').offsetWi
 function renderDock() {
   const vis = visiblePages();
   const a = curAct();
-  $('#dock').innerHTML = TABS.map(([l, k], i) => [k === 'GOLF' ? (a ? a.tag : 'PLAY') : l, i]).map(([l, i]) => `<button data-tab="${i}" aria-current="${i >= S.tab && i < S.tab + vis}">${l}<small>0${i + 1}</small></button>`).join('');
+  $('#dock').innerHTML = TABS.map(([l, k], i) => [k === 'GOLF' ? 'ACTIVITIES' : l, i]).map(([l, i]) => `<button data-tab="${i}" aria-current="${i >= S.tab && i < S.tab + vis}"${l.length > 5 ? ' class="long"' : ''}>${l}<small>0${i + 1}</small></button>`).join('');
 }
 function applyTheme() {
   const w = S.w; if (!w) return;
