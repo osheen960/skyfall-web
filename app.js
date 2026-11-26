@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
-const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00' };
+const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00', textScale: 1.3 };
 const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
 Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
 Voice.id = Prefs.persona;
@@ -34,7 +34,7 @@ function setPalette() {
   st.setProperty('--void', p.bg); st.setProperty('--ink', p.ink); st.setProperty('--inkrgb', rgb(p.ink)); st.setProperty('--voidrgb', rgb(p.bg));
   st.setProperty('--dim', `rgba(${rgb(p.ink)},${LIGHT ? .66 : .58})`); st.setProperty('--faint', `rgba(${rgb(p.ink)},${LIGHT ? .4 : .32})`);
   st.setProperty('--fd', `'${THEME.display}'`); st.setProperty('--fl', `'${THEME.label}'`);
-  st.setProperty('--ds', F[THEME.display][1]); st.setProperty('--ls', F[THEME.label][1]); st.setProperty('--rad', THEME.radius + 'px');
+  const ts = Prefs.textScale || 1; st.setProperty('--ts', ts); st.setProperty('--ds', F[THEME.display][1] * ts); st.setProperty('--ls', F[THEME.label][1] * ts); st.setProperty('--rad', THEME.radius + 'px');
   st.setProperty('--shade', LIGHT ? '255,255,255' : rgb(lerpHex(p.bg, '#000000', .6)));
   INK = p.ink.toLowerCase(); VOID = p.bg.toLowerCase();
   AMBER = M('#ffb547'); ALERT = M(p.alert.toLowerCase()); MAGENTA = M('#ff3b30'); GOOD = M(p.good.toLowerCase());
@@ -799,6 +799,9 @@ function renderSettings() {
     <section class="st-card" data-st="0"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
       <div class="st-seg"><button data-mode="dark" aria-pressed="${!LIGHT}">Dark</button><button data-mode="light" aria-pressed="${LIGHT}">Light</button></div>
       <div class="st-themes">${CATALOG.themes.map(themeCard).join('')}</div></section>
+    <section class="st-card" data-st="0"><h3>Text size</h3><div class="sub">Scales every label and reading in the app.</div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12px;color:var(--dim)">A</span><input type="range" id="stText" min="1" max="1.7" step="0.05" value="${Prefs.textScale || 1}" style="flex:1;accent-color:var(--ac)"><span style="font-size:20px">A</span></div>
+      <div class="st-lbl" style="color:var(--ac)" id="stTextV">${Math.round((Prefs.textScale || 1) * 100)}%</div></section>
     <section class="st-card" data-st="0"><h3>Holidays &amp; occasions</h3><div class="sub">Australian public holidays for your state, plus commemorative and cultural days, change the background and the briefing.</div>
       <div class="st-lbl" style="color:var(--ac)">TODAY: ${esc((S.w ? Occasions.on(dkey(S.w.current.time), Occasions.state) : []).map(o => o.name.toUpperCase()).join(' · ') || 'NOTHING ON THE CALENDAR')}${Occasions.state ? '  //  ' + Occasions.state.toUpperCase() : ''}</div>
       <div class="st-lbl" style="margin-top:12px">PREVIEW A DAY</div>
@@ -913,3 +916,8 @@ async function boot() {
 }
 boot();
 }
+document.addEventListener('input', e => {
+  if (e.target.id !== 'stText') return;
+  Prefs.textScale = +e.target.value; savePrefs(); setPalette();
+  const v = document.getElementById('stTextV'); if (v) v.textContent = Math.round(Prefs.textScale * 100) + '%';
+});
