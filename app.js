@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
-const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00', textScale: 1.3 };
+const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00', textScale: 1.3, broadcastOn: false };
 const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
 Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
 Voice.id = Prefs.persona;
@@ -762,7 +762,7 @@ const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = 
 function briefCard() {
   if (!S.w || !Prefs.briefingOn) return '';
   const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
-  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div><div class="bx" data-console="day">${consoleHtml('day', '▶ BRIEF ME')}</div></div>`;
+  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div>${Prefs.broadcastOn ? `<div class="bx" data-console="day">${consoleHtml('day', '▶ BRIEF ME')}</div>` : ''}</div>`;
 }
 setInterval(() => {
   if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;
@@ -827,7 +827,8 @@ function renderSettings() {
       ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
       <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
       <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
-    <section class="st-card" data-st="2"><h3>Broadcast voice</h3><div class="sub">Natural British voice and a script written fresh in your personality's style, from your own free Google keys. Without keys, Skyfall uses built-in lines and your browser's voice. Keys stay in this browser.</div>
+    <section class="st-card" data-st="2"><h3>Broadcast voice</h3><div class="sub">Optional. Spoken round-ups and fresh daily lines written in your personality's style, using <b>your own</b> free Google keys. Skyfall has no shared key: each person adds theirs, and it stays only in their browser.</div>
+      ${row('fx', 'broadcastOn', 'Spoken broadcasts', 'Show ▶ BRIEF ME and the news broadcast', Prefs.broadcastOn)}
       <div class="st-lbl">GEMINI API KEY (SCRIPT + HEADLINES)</div><input class="st-key" id="kGemini" type="password" autocomplete="off" value="${esc(Store.get('kGemini', ''))}" placeholder="from aistudio.google.com">
       <div class="st-lbl" style="margin-top:10px">CLOUD TEXT-TO-SPEECH KEY (VOICE)</div><input class="st-key" id="kTts" type="password" autocomplete="off" value="${esc(Store.get('kTts', ''))}" placeholder="blank = reuse the Gemini key">
       <div class="sub" style="font-size:11px;margin-top:6px">Text-to-Speech: Google Cloud console → enable the API → Credentials → API key. Free up to 1 million characters a month; a broadcast is about 1,500.</div>
@@ -964,7 +965,7 @@ function renderIntel() {
   pIndex = 0;
   const f = Store.get('intel', null), key = !!VoiceKeys.gemini;
   const head = panel('Intel // broadcast', 'TX-' + (f ? String(f.local.length + f.national.length + f.world.length).padStart(2, '0') : '--'),
-    `<div data-console="news">${consoleHtml('news', '▶ NEWS BROADCAST')}</div>
+    `${Prefs.broadcastOn ? `<div data-console="news">${consoleHtml('news', '▶ NEWS BROADCAST')}</div>` : ''}
      <div class="m" style="display:flex;gap:8px;margin-top:8px;font-size:9px;letter-spacing:1.5px;color:var(--faint)"><span style="flex:1">${!key ? 'ADD A FREE GEMINI KEY IN SETTINGS › VOICE TO RECEIVE HEADLINES' : intelBusy ? 'ACQUIRING SIGNAL…' : intelErr ? 'NO SIGNAL: ' + esc(intelErr) : f ? 'SYNC ' + Math.round((Date.now() - f.at) / 60000) + 'M AGO · VIA GOOGLE SEARCH' : ''}</span>${key ? '<a href="#" id="intelSync" style="color:var(--ac)">↻ RESYNC</a>' : ''}</div>`);
   let body = '';
   if (f) {
