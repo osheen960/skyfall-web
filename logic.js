@@ -639,8 +639,10 @@ const Activities = {
     if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing and neither should you.`;
     const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, Q = CATALOG.quips;
     const pl = Voice.line('ACT', t.limiter, 0);
-    const o = pl ? [pl] : (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
-    const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) + new Date(t.tee).getUTCHours(), o.length)]
+    const pool = (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
+    const o = pl ? (Voice.id === 'deadpan' ? [pl, ...pool] : [pl]) : pool;   // Deadpan (built-in voice) rotates the pool too
+    const hid = [...a.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
+    const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) * 7 + new Date(t.tee).getUTCHours() * 3 + hid, o.length)]
       .replaceAll('{N}', a.name).replaceAll('{n}', a.name.toLowerCase()).replaceAll('{pop}', t.pop).replaceAll('{mm}', f1(t.mm))
       .replaceAll('{wind}', R(t.wind)).replaceAll('{gust}', R(t.gust)).replaceAll('{tmax}', isNaN(t.tMax) ? '--' : R(t.tMax))
       .replaceAll('{tmin}', isNaN(t.tMin) ? '--' : R(t.tMin)).replaceAll('{uv}', R(t.uv)).replaceAll('{score}', t.score);

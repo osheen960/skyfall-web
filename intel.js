@@ -177,3 +177,20 @@ const LoFresh = {
     return null;
   },
 };
+
+/* Fresh activity briefing line per window (Gemini, persona voice, exact conditions). */
+const ActFresh = {
+  busy: {},
+  get(a, t, date) {
+    if (!VoiceKeys.gemini || !t) return null;
+    const k = 'act_' + SkyPrefs.persona + '_' + a.id + '_' + date + '_' + t.tee + '_' + t.score;
+    const c = Store.get(k, null); if (c) return c;
+    if (this.busy[k]) return null; this.busy[k] = true;
+    const hm = ms => new Date(ms).toISOString().slice(11, 16);
+    const sys = `You write the one-line activity briefing on the Skyfall weather console.\n${Voicebox.style()}\nRules: 14 to 34 words, in the persona's voice and humour, about this specific activity and these exact conditions; name what limits it and what to do about it. Make it different from a generic line; never repeat stock phrases. Use only the numbers given. Plain text, no emojis, no markdown, no time range.`;
+    const ded = (t.deductions || []).map(d => `${d.label} -${d.points}`).join('; ');
+    const p = `Activity: ${a.name}. Date: ${date}. Start ${hm(t.tee)} for ${a.hours}h. Score ${t.score}/100. Temp ${Math.round(t.tMin)}-${Math.round(t.tMax)}C, rain chance ${t.pop}% (${(t.mm || 0).toFixed(1)}mm), wind ${Math.round(t.wind)} gusting ${Math.round(t.gust)}km/h, UV ${Math.round(t.uv)}, storm ${!!t.storm}. Main limiter: ${t.limiter}. Deductions: ${ded || 'none'}.`;
+    Voicebox.gemini(sys, p, { temp: 1 }).then(x => { const v = x.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim(); if (v.length > 8) { Store.set(k, v); window.dispatchEvent(new Event('skyfall:refresh')); } }).catch(() => {}).finally(() => { delete this.busy[k]; });
+    return null;
+  },
+};

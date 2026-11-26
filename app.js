@@ -452,10 +452,12 @@ function scoreSummary(date, slot, g, i) {
 function uplink(date, slot, g) {
   const a0 = curAct(), a = a0 && a0.id === 'golf' && Voice.line('ACT', 'NONE') ? a0 : a0;
   if (a && (a.id !== 'golf' || Voice.line('ACT', 'NONE'))) {
-    const text = Activities.brief(a, slot, date);
+    const base = Activities.brief(a, slot, date), fr = slot && ActFresh.get(a, slot, date);
+    const text = fr ? base.split(' · ')[0] + ' · ' + fr : base;
     return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
   }
-  const lines = Caddie.dayLines(g), text = slot ? lines[slot.tee] : Caddie.banter(g);
+  const lines = Caddie.dayLines(g), gd = Activities.find('golf'), base0 = slot ? lines[slot.tee] : Caddie.banter(g);
+  const fr = slot && gd && !/^Ah, such a beautiful morning!/.test(base0) ? ActFresh.get(gd, slot, date) : null, text = fr || base0;
   const freq = (121.5 + (Math.floor(T(date + 'T00:00') / DAY) % 37) * .25).toFixed(2);
   return { html: panel('Fairway uplink // transmission', `FQ ${freq}`, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} SLOT · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
 }
@@ -999,7 +1001,7 @@ document.addEventListener('click', e => {
   }
   if (t.closest('#stVoiceTest')) Broadcast.start('test', null, [Voice.line('NEWS', 'INTRO') || 'Skyfall online.', 'Voice check complete. Signal is clean.']);
 });
-window.addEventListener('skyfall:refresh', () => renderCore());
+window.addEventListener('skyfall:refresh', () => { renderCore(); renderGolf(); });
 document.addEventListener('change', e => { if (e.target.id === 'kGemini' || e.target.id === 'kTts') { VoiceKeys.set($('#kGemini').value, $('#kTts').value); Store.del('intel'); } });
 document.addEventListener('click', e => { if (e.target.closest('#dock [data-tab]')) setTimeout(() => { if (tabKey(S.tab) === 'NEWS') renderIntel(); }, 350); });
 boot();
