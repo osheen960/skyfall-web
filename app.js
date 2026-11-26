@@ -757,10 +757,9 @@ const todayKey = () => S.w ? dkey(S.w.current.time) : '';
 const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = new Date(localNow(S.w.off)), [h, m] = Prefs.briefingAt.split(':').map(Number); return n.getUTCHours() * 60 + n.getUTCMinutes() >= h * 60 + m; };
 function briefCard() {
   if (!S.w || !Prefs.briefingOn) return '';
-  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector'), folded = Store.get('briefFolded', '') === todayKey();
-  return `<div class="brief ${folded ? 'folded' : ''}" id="briefCard" role="button" tabindex="0" aria-expanded="${!folded}"><div class="t"><span>${esc(b.title.toUpperCase())}</span><i aria-hidden="true">${folded ? '▾' : '✕'}</i></div>${folded ? '' : `<div class="b">${esc(b.body)}</div>`}</div>`;
+  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
+  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div></div>`;
 }
-document.addEventListener('click', e => { if (e.target.closest('#briefCard')) { const f = Store.get('briefFolded', '') === todayKey(); Store.set('briefFolded', f ? '' : todayKey()); renderCore(); } });
 setInterval(() => {
   if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;
   Store.set('briefPushed', todayKey());
