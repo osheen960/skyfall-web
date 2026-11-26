@@ -136,6 +136,27 @@ const Scene = (() => {
     c.save();
     if (shakeF > 0.3) c.translate((rnd() - 0.5) * 14 * D * shakeF, (rnd() - 0.5) * 10 * D * shakeF);
 
+    // Activity with a photo (scenes/<id>.jpg, Unsplash License): the real place, graded for time and weather, live weather on top.
+    const pk = inp.kind || 'city', photo = pk !== 'city' ? Photos.get(pk) : null;
+    if (photo) {
+      const sc = Math.max(W / photo.width, H / photo.height), sw = W / sc, sh = H / sc, sx = (photo.width - sw) / 2, sy = (photo.height - sh) * 0.4;
+      const wet = Math.max(lvOver, lvRain, lvFog), br = 1 - 0.18 * lvRain - 0.1 * lvOver - 0.55 * dark;
+      c.filter = `saturate(${(1 - 0.55 * wet - 0.35 * dark).toFixed(2)}) brightness(${br.toFixed(2)})`;
+      c.drawImage(photo, sx, sy, sw, sh, 0, 0, W, H); c.filter = 'none';
+      const wg = c.createLinearGradient(0, 0, 0, H); wg.addColorStop(0, css(mix.top, 0.18 + 0.3 * dark)); wg.addColorStop(0.5, css(mix.bot, 0.10 + 0.12 * dark)); wg.addColorStop(1, css(mix.top, 0.25 * dark));
+      c.fillStyle = wg; c.fillRect(0, 0, W, H);
+      if (lvFog > 0.01) drawFog(tm);
+      if (lvStorm > 0.3) drawLightning(t);
+      if (lvRain > 0.01 && !reduce) drawStreaks(t, slant);
+      if (lvSnow > 0.01 && !reduce) drawSnow(t, windX, inp.wind);
+      const rgb = a => [a[1], a[2], a[3]];
+      if (inp.fx && inp.fx.length) Festive.draw(c, inp.fx, inp.fxDay || 0, { W, H, ground, t: tm, dt: reduce ? 0 : dt, dark, skyTop: rgb(mix.top), skyMid: rgb(mix.mid), skyBot: rgb(mix.bot), rain: lvRain, fog: lvFog, storm: lvStorm, snow: lvSnow, overcast: lvOver, windKmh: inp.wind, windX, snowDepth, tempC: inp.tempC ?? NaN, label: inp.label || '', minute: inp.minute });
+      if ((lvRain > 0.05 || drops.length) && !reduce) drawGlass(dt);
+      c.restore();
+      if (strikeAt >= 0) { const f = flash(t - strikeAt); if (f > 0) { c.fillStyle = css(C('#EEF2FF'), (reduce ? 0.18 : 0.78) * f * lvStorm); c.fillRect(0, 0, W, H); } }
+      return;
+    }
+
     // 1. Sky
     const g = c.createLinearGradient(0, 0, 0, horizon); g.addColorStop(0, css(mix.top)); g.addColorStop(0.58, css(mix.mid)); g.addColorStop(1, css(mix.bot));
     c.fillStyle = g; c.fillRect(0, 0, W, H);
@@ -376,3 +397,8 @@ const Scene = (() => {
 })();
 
 function moonPhase(ms) { const synodic = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14); return fmod((ms - ref) / DAY / synodic, 1); }
+
+/* Activity scene photos: lazy-loaded, cached; null until ready or if an activity has none. */
+const Photos = { img: {}, bad: new Set(),
+  get(id) { if (this.bad.has(id)) return null; const i = this.img[id]; if (i) return i.complete && i.naturalWidth ? i : null;
+    const n = new Image(); n.decoding = 'async'; n.onerror = () => this.bad.add(id); n.src = 'scenes/' + id + '.jpg?v=1'; this.img[id] = n; return null; } };

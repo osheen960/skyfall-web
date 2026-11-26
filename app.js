@@ -13,7 +13,7 @@ Voice.id = Prefs.persona;
 window.SkyPrefs = Prefs;
 const savePrefs = () => { Voice.id = Prefs.persona; Store.set('prefs', Prefs); };
 const primaryAct = () => Activities.find(Prefs.activities[0] || '') || null;
-const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air'], ['INTEL', 'NEWS', 'p-intel']];
+const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air']];   // INTEL (news) is phone-only: news sites block browsers from reading their feeds
 const TAB_PREF = { SCAN: 'SCAN', TRAJ: 'TRAJ', DATA: 'DATA', GOLF: 'ACT', AIR: 'AIR', NEWS: 'NEWS' };
 let TABS = ALL_TABS;
 function computeTabs() {
@@ -771,7 +771,7 @@ setInterval(() => {
   const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector'); pushNote(b.title, b.body, 'briefing'); renderCore();
 }, 30000);
 /* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
-const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen'], ['NEWS', 'Intel: news headlines']];
+const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
 const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
 let stQuery = '', stTab = 0;
 function themeCard(t) {
@@ -828,7 +828,7 @@ function renderSettings() {
       ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
       <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
       <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
-    <section class="st-card" data-st="2"><h3>Gemini key (optional)</h3><div class="sub">Your own free key from aistudio.google.com/app/apikey. It powers INTEL headlines and fresh daily loadout and activity lines in your personality's voice. Skyfall has no shared key: each person adds their own, and it stays only in their browser.</div>
+    <section class="st-card" data-st="2"><h3>Gemini key (optional)</h3><div class="sub">Your own free key from aistudio.google.com/app/apikey. It powers fresh daily loadout and activity lines in your personality's voice. Skyfall has no shared key: each person adds their own, and it stays only in their browser.</div>
       <input class="st-key" id="kGemini" type="password" autocomplete="off" value="${esc(Store.get('kGemini', ''))}" placeholder="Paste your key"></section>
     <section class="st-card" data-st="4"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
       ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
@@ -838,7 +838,7 @@ function renderSettings() {
       ${row('fx', 'liveSky', 'Live sky behind CORE', 'The animated weather scene', Prefs.liveSky)}${row('fx', 'boot', 'Boot sequence', 'Terminal intro when the app opens', Prefs.boot)}</section>
     <section class="st-card" data-st="5"><h3>No accounts, no tracking</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Skyfall has no sign-in, no ads, no analytics, no cookies and no tracking of any kind. There is no Skyfall server: nothing about you is sent to us, because there is no “us” to send it to.</div></section>
     <section class="st-card" data-st="5"><h3>What stays in your browser</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your settings, activities, personality, last location, cached forecast and any keys you add live only in this browser's local storage. Clearing site data removes all of it.</div></section>
-    <section class="st-card" data-st="5"><h3>Who this page talks to</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your browser contacts these public services directly: Open-Meteo (forecast, air quality, place search; receives rounded coordinates or your search), BigDataCloud (names your location from rounded coordinates), Google Pollen only if you add a key (receives coordinates), and Google Gemini only if you add your own key (it receives your city name, personality and the day's weather numbers, to find headlines and write fresh lines). A strict security policy blocks this page from contacting anything else. Like any web request, each can see your IP address. Nothing else about you is sent.</div></section>
+    <section class="st-card" data-st="5"><h3>Who this page talks to</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your browser contacts these public services directly: Open-Meteo (forecast, air quality, place search; receives rounded coordinates or your search), BigDataCloud (names your location from rounded coordinates), Google Pollen only if you add a key (receives coordinates), and Google Gemini only if you add your own key (it receives your personality and the day's weather numbers, to write fresh lines). A strict security policy blocks this page from contacting anything else. Like any web request, each can see your IP address. Nothing else about you is sent.</div></section>
     <section class="st-card" data-st="5"><h3>Hosting</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The site is static files on GitHub Pages. GitHub, like any web host, may log visitors' IP addresses; Skyfall itself collects nothing.</div></section>
     <section class="st-card" data-st="5"><h3>Location</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Location is only used in your browser to pick your forecast, and only if you allow it. You can always search for a place instead.</div></section>
     <section class="st-card" data-st="5"><h3>The Android app</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The app works the same way: everything is stored on the phone, alerts and briefings are worked out on the device, and it only contacts the public weather and news services, plus Google Gemini if you add your own key for fresh daily lines.</div></section>
