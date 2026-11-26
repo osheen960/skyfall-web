@@ -31,17 +31,25 @@ const Voicebox = {
     const body = { system_instruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: temp, maxOutputTokens: 1600 } };
     if (search) body.tools = [{ google_search: {} }];
     const pref = Store.get('gModel', null), avail = await this.models(key); let first;
-    for (const m of [pref, ...avail.filter(x => x !== pref)].filter(Boolean).slice(0, 5)) {
+    let busy = 0;
+    for (const m of [pref, ...avail.filter(x => x !== pref)].filter(Boolean).slice(0, 6)) {
       try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
-        const j = await r.json();
+        let r, j, wait = 1500;
+        for (let a = 0; a < 3; a++) {   // short backoff on Google's "busy" answers
+          r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
+          j = await r.json();
+          if (![429, 500, 503].includes(r.status) || a === 2) break;
+          await new Promise(res => setTimeout(res, wait)); wait *= 2;
+        }
+        if ([429, 500, 503].includes(r.status)) busy++;
         if (!r.ok) { const er = new Error(`${m}: ${j.error?.message || 'HTTP ' + r.status}`); first = first || er; if (r.status === 401 || r.status === 403 || /API key/.test(er.message)) throw er; if (pref === m) Store.del('gModel'); continue; }
         const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
         if (!text.trim()) continue;
         Store.set('gModel', m); return text;
       } catch (e) { first = first || e; if (/API key|PERMISSION/.test(e.message)) throw e; }
     }
-    if (search) return this.gemini(system, prompt, { search: false, temp });   // some models/tiers lack Search grounding
+    if (search && !busy) return this.gemini(system, prompt, { search: false, temp });   // some models/tiers lack Search grounding
+    if (busy) throw new Error("Google's AI is overloaded right now. Try again in a minute.");
     throw first || new Error('No script');
   },
   async write(system, prompt, opts) {
