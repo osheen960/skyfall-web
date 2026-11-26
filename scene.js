@@ -116,7 +116,7 @@ const Scene = (() => {
   }
 
   function draw(t, dt) {
-    ensureAssets(); ensureSkyline();
+    ensureAssets();
     const inp = input, sky = inp.sky, c = ctx;
     const tRain = ['DRIZZLE', 'RAIN', 'STORM'].includes(sky) ? Math.max(0.3, inp.intensity) : 0;
     const tSnow = sky === 'SNOW' ? Math.max(0.35, inp.intensity) : 0, tFog = sky === 'FOG' ? 1 : 0, tStorm = sky === 'STORM' ? 1 : 0;
@@ -127,7 +127,7 @@ const Scene = (() => {
     lvRain += (tRain - lvRain) * k; lvSnow += (tSnow - lvSnow) * k; lvFog += (tFog - lvFog) * k; lvStorm += (tStorm - lvStorm) * k;
     lvOver += (tOver - lvOver) * k; lvClouds += (tClouds - lvClouds) * k; lvClear += (tClear - lvClear) * k;
     timePalette(inp.minute, inp.rise, inp.set);
-    const dark = mix.dark, horizon = H * 0.86, ground = H * 0.9;
+    const dark = mix.dark, horizon = H * 0.86, ground = H * 0.88;
     const toRad = (inp.windFrom + 180) * Math.PI / 180, sx0 = Math.sin(toRad), windX = Math.abs(sx0) < 0.2 ? 0.2 * (sx0 < 0 ? -1 : 1) : sx0;
     const slant = Math.max(-0.45, Math.min(0.45, windX * Math.min(inp.wind, 50) / 70));
     const tm = reduce ? 0 : t; // frozen motion when reduced
@@ -164,7 +164,11 @@ const Scene = (() => {
     if (lvSnow > 0.01 && !reduce) drawSnow(t, windX, inp.wind);
 
     // 7. Skyline, 8. ground effects, 9. glass
-    drawSkyline(ground, dark, tm);
+    // Futuristic city + street (city.js, port of Android NeonCity).
+    const rgb = a => [a[1], a[2], a[3]];
+    NeonCity.draw(c, { W, H, ground, t: tm, dt: reduce ? 0 : dt, dark, skyTop: rgb(mix.top), skyMid: rgb(mix.mid), skyBot: rgb(mix.bot),
+      rain: lvRain, fog: lvFog, storm: lvStorm, snow: lvSnow, overcast: lvOver, windKmh: inp.wind, windX, snowDepth,
+      tempC: inp.tempC ?? NaN, label: inp.label || '', minute: inp.minute }, dpr);
     if (lvRain > 0.05 && !reduce) drawRipples(ground, dt, dark);
     snowDepth = lvSnow > 0.05 ? Math.min(H * 0.07 * lvSnow, snowDepth + dt * H * 0.0009 * lvSnow) : Math.max(0, snowDepth - dt * H * 0.0004);
     if (snowDepth > 0.5) drawDrift();

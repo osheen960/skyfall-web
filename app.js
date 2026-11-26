@@ -628,7 +628,7 @@ function applyTheme() {
   const hourStart = localNow(w.off) - localNow(w.off) % HOUR, hr = w.hourly.find(h => h.time >= hourStart) || w.hourly[0];
   const code = hr ? hr.code : w.current.code;
   const intensity = ({ 51: .25, 56: .25, 53: .35, 55: .45, 57: .45, 61: .5, 66: .5, 63: .8, 65: 1, 67: 1, 80: .6, 81: .85, 82: 1, 71: .5, 73: .75, 75: 1, 77: .4, 85: .6, 86: 1, 95: 1, 96: 1, 99: 1 })[code] || 0;
-  Scene.set({ sky: Codes.sky(code), intensity, minute: minute + n.getUTCSeconds() / 60, rise, set, wind: hr ? hr.wind : w.current.windSpeed, windFrom: hr ? hr.dir : w.current.windDirection,
+  Scene.set({ tempC: w.current.temperature, label: Codes.label(code).toUpperCase(), sky: Codes.sky(code), intensity, minute: minute + n.getUTCSeconds() / 60, rise, set, wind: hr ? hr.wind : w.current.windSpeed, windFrom: hr ? hr.dir : w.current.windDirection,
     cloudCover: w.current.cloudCover || 0, moon: moonPhase(Date.now()), southern: w.lat < 0 });
   $('#ambTemp').textContent = deg(w.current.temperature);
   $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + '';
