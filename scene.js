@@ -127,7 +127,7 @@ const Scene = (() => {
     lvRain += (tRain - lvRain) * k; lvSnow += (tSnow - lvSnow) * k; lvFog += (tFog - lvFog) * k; lvStorm += (tStorm - lvStorm) * k;
     lvOver += (tOver - lvOver) * k; lvClouds += (tClouds - lvClouds) * k; lvClear += (tClear - lvClear) * k;
     timePalette(inp.minute, inp.rise, inp.set);
-    const dark = mix.dark, horizon = H * 0.86, ground = H * 0.88;
+    const dark = mix.dark, horizon = H * 0.86, ground = H * ((inp.kind || 'city') === 'city' ? 0.88 : 0.78);   // activity scenes sit higher, clear of the dock
     const toRad = (inp.windFrom + 180) * Math.PI / 180, sx0 = Math.sin(toRad), windX = Math.abs(sx0) < 0.2 ? 0.2 * (sx0 < 0 ? -1 : 1) : sx0;
     const slant = Math.max(-0.45, Math.min(0.45, windX * Math.min(inp.wind, 50) / 70));
     const tm = reduce ? 0 : t; // frozen motion when reduced

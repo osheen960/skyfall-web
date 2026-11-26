@@ -5,8 +5,9 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
-const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00', textScale: 1.3, broadcastOn: false };
+const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00', textScale: 1, broadcastOn: false };
 const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
+if (!Prefs.tsV3) { Prefs.textScale = 1; Prefs.tsV3 = true; }   // 130% default was too big
 Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
 Voice.id = Prefs.persona;
 window.SkyPrefs = Prefs;

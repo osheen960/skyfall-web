@@ -378,6 +378,14 @@ const Landscape = (() => {
     let x = 0; while (x < e.W + 80) { c.lineTo(x + 30, base - e.H * (0.08 + 0.12 * r())); x += 60 + r() * 60; c.lineTo(x, base - e.H * 0.03 * r()); }
     c.lineTo(e.W, e.H); c.closePath(); c.fillStyle = rgba(lerp(lerp(H2('#5E6E80'), H2('#080C16'), e.dark), e.skyBot, 0.5)); c.fill();
   }
+  function holoGrid() {
+    const g = e.ground, vx = e.W / 2, vy = g - e.H * 0.05, col = [76, 155, 255], a = 0.10 + 0.16 * e.dark, f = (g - vy) / (e.H - vy);
+    c.lineWidth = 1;
+    for (let i = -12; i <= 12; i++) { const bx = vx + i * e.W * 0.12; c.strokeStyle = rgba(col, a * (1 - Math.abs(i) / 14)); c.beginPath(); c.moveTo(vx + (bx - vx) * f, g); c.lineTo(bx, e.H); c.stroke(); }
+    const off = (e.t * 0.25) % 1;
+    for (let k = 0; k < 9; k++) { const z = (k + off) / 9, y = g + (e.H - g) * z * z; c.strokeStyle = rgba(col, a * (0.3 + 0.7 * z)); c.beginPath(); c.moveTo(0, y); c.lineTo(e.W, y); c.stroke(); }
+    c.strokeStyle = rgba([61, 255, 208], a * 1.6); c.lineWidth = 1.4; c.beginPath(); c.moveTo(0, g); c.lineTo(e.W, g); c.stroke();
+  }
   /* Per-activity props from catalog.scenes (spec/catalog.py SCENES); mirrors Landscape.kt props(). */
   const cache = {};
   function scene(id) {
@@ -398,20 +406,24 @@ const Landscape = (() => {
       let sx = 0, sy = 0; if (pr.dx) { sx = pr.dx * e.t; sx -= Math.trunc(sx / 1.3) * 1.3; } if (pr.dy) { sy = pr.dy * e.t; sy -= Math.trunc(sy / 1.1) * 1.1; }
       const by = pr.bob ? -Math.abs(Math.sin(e.t * 1.3 + pr.phase)) * pr.bob : 0, bx = pr.sway ? Math.sin(e.t * 1.5 + pr.phase) * pr.sway * (0.5 + e.windKmh / 20) * e.windX : 0;
       pts.length = 0;
+      sy -= 0.88 - e.ground / e.H;   // props authored for ground at 0.88
       { const ax = pr.p[0] + sx, ay = pr.p[1] + sy; if (ax > 1.15) sx -= 1.3; else if (ax < -0.15) sx += 1.3; if (ay > 1.0) sy -= 1.1; else if (ay < -0.1) sy += 1.1; }
       for (let k = 0; k < pr.p.length; k += 2) pts.push((pr.p[k] + sx) * e.W + bx, (pr.p[k + 1] + sy) * e.H + by);
-      const stroke = pr.stroke || pr.t === 'line'; c.fillStyle = col; c.strokeStyle = col; c.lineWidth = pr.w; c.lineCap = 'round';
-      const paint = () => stroke ? c.stroke() : c.fill();
+      // Holographic style: translucent body + bright neon edge with bloom.
+      const stroke = pr.stroke || pr.t === 'line', base = lerp(pr.day, pr.night, e.dark * 0.45);
+      const neon = rgba(lerp(base, [255, 255, 255], 0.3), al), bloom = rgba(pr.day, (0.55 + 0.35 * e.dark) * al), fillC = rgba(base, al * (0.22 + 0.1 * (1 - e.dark)));
+      c.lineCap = 'round';
+      const paint = () => { if (!stroke) { c.shadowBlur = 0; c.fillStyle = fillC; c.fill(); } c.shadowColor = bloom; c.shadowBlur = 6; c.strokeStyle = neon; c.lineWidth = stroke ? pr.w : 1.2; c.stroke(); c.shadowBlur = 0; c.shadowColor = 'transparent'; c.fillStyle = col; };
       const [x0, y0, x1, y1] = pts;
       switch (pr.t) {
         case 'rect': c.beginPath(); c.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)); paint(); break;
         case 'oval': c.beginPath(); c.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, 7); paint(); break;
-        case 'line': c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); break;
+        case 'line': c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); paint(); break;
         case 'poly': c.beginPath(); c.moveTo(pts[0], pts[1]); for (let k = 2; k < pts.length; k += 2) c.lineTo(pts[k], pts[k + 1]); c.closePath(); paint(); break;
         case 'circ': c.beginPath(); c.arc(x0, y0, pr.r, 0, 7); paint(); break;
         case 'glow': glow(x0, y0, pr.r * (1 + 0.5 * e.fog), pr.day, al); break;
         case 'arc': c.beginPath(); pr.flip ? c.arc(x0, y0, pr.r, 0, Math.PI) : c.arc(x0, y0, pr.r, Math.PI, 0); if (!stroke) c.closePath(); paint(); break;
-        case 'text': { const sz = pr.r * e.H; c.textAlign = 'center'; c.font = `700 ${sz}px sans-serif`; c.fillText((pr.s || '').replace('{temp}', isNaN(e.tempC) ? '--' : Math.trunc(e.tempC)), x0, y0 - sz * 0.2); c.textAlign = 'start'; break; }
+        case 'text': { const sz = pr.r * e.H; c.textAlign = 'center'; c.font = `700 ${sz}px sans-serif`; c.fillStyle = neon; c.shadowColor = bloom; c.shadowBlur = 5; c.fillText((pr.s || '').replace('{temp}', isNaN(e.tempC) ? '--' : Math.trunc(e.tempC)), x0, y0 - sz * 0.2); c.textAlign = 'start'; c.shadowBlur = 0; c.shadowColor = 'transparent'; break; }
       }
     }
   }
@@ -421,6 +433,7 @@ const Landscape = (() => {
       const sc = scene(kind);
       if (sc) {
         ({ golf, water: () => sea(false), sail: () => sea(true), alpine, stadium: () => stadium(false), road, field: () => field(false), trail: () => { ridge(); park(false, 6); } }[sc.base] || (() => park(false)))();
+        if (sc.base !== 'water' && sc.base !== 'sail') holoGrid();
         props(sc.props);
       } else ({ golf, water: () => sea(false), wind: () => sea(true), snow: alpine, ball: stadium, ride: road, sky: field, foot: () => park(false), chill: () => park(true) }[kind] || (() => park(false)))();
 
