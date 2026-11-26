@@ -9,13 +9,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Skyfall">
 <meta name="description" content="Skyfall — sci-fi HUD weather with live station data, golf forecasts and a sarcastic comms feed.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com https://geocoding-api.open-meteo.com https://pollen.googleapis.com https://api.bigdatacloud.net; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com https://geocoding-api.open-meteo.com https://pollen.googleapis.com https://api.bigdatacloud.net https://generativelanguage.googleapis.com https://texttospeech.googleapis.com; media-src 'self' data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Skyfall</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -46,6 +46,7 @@
   <section class="page" id="p-data" data-tab="DATA"></section>
   <section class="page" id="p-golf" data-tab="GOLF"></section>
   <section class="page" id="p-air" data-tab="AIR"></section>
+  <section class="page" id="p-intel" data-tab="NEWS"></section>
 </main>
 
 <nav id="dock" aria-label="Sections"></nav>
@@ -65,11 +66,12 @@
   <button class="txt amb-close" id="ambClose">[EXIT AMBIENT]</button>
 </div>
 
-<script src="catalog.js?v=27"></script>
-<script src="logic.js?v=27"></script>
-<script src="city.js?v=27"></script>
-<script src="scene.js?v=27"></script>
-<script src="core.js?v=27"></script>
-<script src="app.js?v=27"></script>
+<script src="catalog.js?v=30"></script>
+<script src="logic.js?v=30"></script>
+<script src="city.js?v=30"></script>
+<script src="scene.js?v=30"></script>
+<script src="core.js?v=30"></script>
+<script src="intel.js?v=30"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

@@ -388,3 +388,16 @@ body[data-shape=round] .ph i,body[data-shape=outline] .ph i{border-radius:50%}
 .st-tabs button{flex:none;border-radius:999px;padding:9px 16px;font-weight:600;font-size:14px;background:rgba(var(--inkrgb),.07);transition:background .2s}
 .st-tabs button[aria-selected=true]{background:var(--ac);color:var(--void)}
 .st-card[hidden]{display:none}
+
+/* ---- broadcast console + INTEL ---- */
+.bc{display:flex;align-items:center;gap:12px}.bc canvas{flex:1;min-width:0;height:34px}
+.bcb{border:1.5px solid var(--ac);background:color-mix(in srgb,var(--ac) 10%,transparent);color:var(--ac);font:10px var(--fl),monospace;letter-spacing:1.5px;padding:9px 12px;cursor:pointer;white-space:nowrap}
+.bcs{font:9px var(--fl),monospace;letter-spacing:1.5px;color:var(--ac);margin-top:6px}.bcl{font-style:italic;font-size:14px;line-height:1.45;margin-top:4px;color:var(--ink)}
+.brief .bx{margin-top:10px}
+.itabs{display:flex;gap:6px;margin-bottom:6px}.itabs button{flex:1;border:1px solid rgba(var(--inkrgb),.15);background:none;color:var(--dim);font:10px var(--fl),monospace;letter-spacing:1.5px;padding:8px 0;cursor:pointer}
+.itabs button[aria-pressed=true]{border-color:var(--ac);color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,transparent)}
+.irow{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid rgba(var(--inkrgb),.07);cursor:pointer}.irow .ix{font:11px var(--fl),monospace;color:var(--ac);width:22px;flex:none;padding-top:2px}
+.irow .it{font-size:14px;line-height:1.35;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.irow .it.open{-webkit-line-clamp:unset}
+.irow .im{font:9px var(--fl),monospace;letter-spacing:1.5px;color:var(--faint);margin-top:2px}.irow .is{font-size:13px;line-height:1.4;color:var(--dim);margin-top:6px}
+.irow .io{display:inline-block;font:10px var(--fl),monospace;letter-spacing:1.5px;color:var(--ac);margin-top:6px}
+.st-key{width:100%;box-sizing:border-box;background:rgba(var(--inkrgb),.06);border:0;border-radius:10px;padding:10px 12px;color:var(--ink);font-size:14px;margin-top:4px}

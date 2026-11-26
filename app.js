@@ -9,10 +9,11 @@ const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore:
 const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
 Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
 Voice.id = Prefs.persona;
+window.SkyPrefs = Prefs;
 const savePrefs = () => { Voice.id = Prefs.persona; Store.set('prefs', Prefs); };
 const primaryAct = () => Activities.find(Prefs.activities[0] || '') || null;
-const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air']];
-const TAB_PREF = { SCAN: 'SCAN', TRAJ: 'TRAJ', DATA: 'DATA', GOLF: 'ACT', AIR: 'AIR' };
+const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air'], ['INTEL', 'NEWS', 'p-intel']];
+const TAB_PREF = { SCAN: 'SCAN', TRAJ: 'TRAJ', DATA: 'DATA', GOLF: 'ACT', AIR: 'AIR', NEWS: 'NEWS' };
 let TABS = ALL_TABS;
 function computeTabs() {
   TABS = ALL_TABS.filter(([, k]) => k === 'CORE' || (!Prefs.hiddenTabs.includes(TAB_PREF[k]) && (k !== 'GOLF' || Prefs.activities.length)));
@@ -48,6 +49,7 @@ const S = {
   coreDay: null, golfDay: null, golfSlot: null, golfTab: 'BRIEF',
   hand: Store.get('hand', 'L'), pollenKey: Store.get('pollenKey', ''), pollenError: null, tab: 0, error: null,
 };
+window.SkyState = S;
 
 /* ---------- shared bits ---------- */
 const deg = x => (x == null || isNaN(x) ? '--' : R(x) + '°');
@@ -648,7 +650,7 @@ function updateSceneKind() {
   const sky = $('#sky'); sky.style.transition = 'none'; sky.style.opacity = 0.25; requestAnimationFrame(() => { sky.style.transition = 'opacity .7s'; sky.style.opacity = 1; });
 }
 function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#scrim').style.opacity = 1; document.documentElement.style.setProperty('--sb', '0.22'); }
-function renderAll() { renderAlerts(); renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
+function renderAll() { renderAlerts(); renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); renderIntel(); }
 
 /* ---------- data flow ---------- */
 function loadFromCache() {
@@ -758,7 +760,7 @@ const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = 
 function briefCard() {
   if (!S.w || !Prefs.briefingOn) return '';
   const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
-  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div></div>`;
+  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div><div class="bx" data-console="day">${consoleHtml('day', '▶ BRIEF ME')}</div></div>`;
 }
 setInterval(() => {
   if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;
@@ -766,7 +768,7 @@ setInterval(() => {
   const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector'); pushNote(b.title, b.body, 'briefing'); renderCore();
 }, 30000);
 /* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
-const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
+const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen'], ['NEWS', 'Intel: news broadcasts']];
 const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
 let stQuery = '', stTab = 0;
 function themeCard(t) {
@@ -794,7 +796,7 @@ function renderSettings() {
   const el = $('#settings'), scroll = el.querySelector('.st-body')?.scrollTop || 0;
   const mine = Prefs.activities.map((id, i) => { const a = Activities.find(id); return a ? `<span class="st-mine ${i === 0 ? 'first' : ''}" data-first="${id}">${i === 0 ? '★ ' : ''}${esc(a.name)}<i data-toggle="${id}" aria-label="Remove ${esc(a.name)}">×</i></span>` : ''; }).join('');
   el.innerHTML = `<div class="st-head"><div style="flex:1"><div class="k">CUSTOMISE</div><h2>Settings</h2></div><button class="st-x" id="stClose" aria-label="Close settings">✕</button></div>
-  <nav class="st-tabs" role="tablist">${['Look', 'Activities', 'Voice', 'Alerts', 'Layout'].map((l, i) => `<button role="tab" data-sttab="${i}" aria-selected="${i === stTab}">${l}</button>`).join('')}</nav>
+  <nav class="st-tabs" role="tablist">${['Look', 'Activities', 'Voice', 'Alerts', 'Layout', 'Privacy'].map((l, i) => `<button role="tab" data-sttab="${i}" aria-selected="${i === stTab}">${l}</button>`).join('')}</nav>
   <div class="st-body">
     <section class="st-card" data-st="0"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
       <div class="st-seg"><button data-mode="dark" aria-pressed="${!LIGHT}">Dark</button><button data-mode="light" aria-pressed="${LIGHT}">Light</button></div>
@@ -823,12 +825,24 @@ function renderSettings() {
       ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
       <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
       <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
+    <section class="st-card" data-st="2"><h3>Broadcast voice</h3><div class="sub">Natural British voice and a script written fresh in your personality's style, from your own free Google keys. Without keys, Skyfall uses built-in lines and your browser's voice. Keys stay in this browser.</div>
+      <div class="st-lbl">GEMINI API KEY (SCRIPT + HEADLINES)</div><input class="st-key" id="kGemini" type="password" autocomplete="off" value="${esc(Store.get('kGemini', ''))}" placeholder="from aistudio.google.com">
+      <div class="st-lbl" style="margin-top:10px">CLOUD TEXT-TO-SPEECH KEY (VOICE)</div><input class="st-key" id="kTts" type="password" autocomplete="off" value="${esc(Store.get('kTts', ''))}" placeholder="blank = reuse the Gemini key">
+      <div class="sub" style="font-size:11px;margin-top:6px">Text-to-Speech: Google Cloud console → enable the API → Credentials → API key. Free up to 1 million characters a month; a broadcast is about 1,500.</div>
+      <div class="st-lbl" style="color:var(--ac);margin-top:8px">VOICE: ${esc(Voicebox.voiceFor(Prefs.persona).replace('en-GB-', '').toUpperCase())}</div>
+      <button class="st-chip" id="stVoiceTest" style="margin-top:8px">▶ Test voice</button></section>
     <section class="st-card" data-st="4"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
       ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
     <section class="st-card" data-st="4"><h3>Core screen</h3><div class="sub">What sits under the main gauge.</div>
       ${CORE_LABELS.map(([id, l]) => row('corepref', id, l, '', !Prefs.hiddenCore.includes(id))).join('')}</section>
     <section class="st-card" data-st="4"><h3>Effects</h3>
       ${row('fx', 'liveSky', 'Live sky behind CORE', 'The animated weather scene', Prefs.liveSky)}${row('fx', 'boot', 'Boot sequence', 'Terminal intro when the app opens', Prefs.boot)}</section>
+    <section class="st-card" data-st="5"><h3>No accounts, no tracking</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Skyfall has no sign-in, no ads, no analytics, no cookies and no tracking of any kind. There is no Skyfall server: nothing about you is sent to us, because there is no “us” to send it to.</div></section>
+    <section class="st-card" data-st="5"><h3>What stays in your browser</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your settings, activities, personality, last location, cached forecast and any keys you add live only in this browser's local storage. Clearing site data removes all of it.</div></section>
+    <section class="st-card" data-st="5"><h3>Who this page talks to</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your browser contacts these public services directly: Open-Meteo (forecast, air quality, place search; receives rounded coordinates or your search), BigDataCloud (names your location from rounded coordinates), Google Pollen only if you add a key (receives coordinates), and Google Gemini and Cloud Text-to-Speech only if you add keys (they receive the day's weather numbers, your city name, personality and headlines to write, find and voice broadcasts). A strict security policy blocks this page from contacting anything else. Like any web request, each can see your IP address. Nothing else about you is sent.</div></section>
+    <section class="st-card" data-st="5"><h3>Hosting</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The site is static files on GitHub Pages. GitHub, like any web host, may log visitors' IP addresses; Skyfall itself collects nothing.</div></section>
+    <section class="st-card" data-st="5"><h3>Location</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Location is only used in your browser to pick your forecast, and only if you allow it. You can always search for a place instead.</div></section>
+    <section class="st-card" data-st="5"><h3>The Android app</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The app works the same way: everything is stored on the phone, alerts and briefings are worked out on the device, and it only contacts the public weather and news services, plus Google's Gemini and Text-to-Speech if you add your own keys for spoken broadcasts.</div></section>
     <button class="st-reset" id="stReset">Reset to defaults</button>
     <div class="st-foot">SAVED ON THIS DEVICE. WEATHER DATA IS ALWAYS OPEN-METEO.</div>
   </div>`;
@@ -914,10 +928,78 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
 }
-boot();
-}
 document.addEventListener('input', e => {
   if (e.target.id !== 'stText') return;
   Prefs.textScale = +e.target.value; savePrefs(); setPalette();
   const v = document.getElementById('stTextV'); if (v) v.textContent = Math.round(Prefs.textScale * 100) + '%';
 });
+
+/* ---------- INTEL + broadcast consoles ---------- */
+function consoleHtml(kind, label) {
+  const B = Broadcast, mine = B.kind === kind, line = B.script[B.seg];
+  return `<div class="bc"><canvas class="wave${mine ? ' live' : ''}" height="34"></canvas><button class="bcb" data-bc="${kind}">${mine ? '■ END' : label}</button></div>` +
+    (mine ? `<div class="bcs">${esc(B.preparing ? B.status : '◉ ON AIR' + (B.adaptive ? '' : ' · BUILT-IN VOICE') + (/FAILED/.test(B.status) ? ' · ' + B.status : ''))}</div>${line ? `<div class="bcl">${esc(line)}</div>` : ''}` : '');
+}
+function refreshConsoles() { document.querySelectorAll('[data-console]').forEach(el => { el.innerHTML = consoleHtml(el.dataset.console, el.dataset.console === 'day' ? '▶ BRIEF ME' : '▶ NEWS BROADCAST'); }); }
+Broadcast.onChange = refreshConsoles;
+(function waves() { const t = performance.now() / 1000;
+  document.querySelectorAll('canvas.wave').forEach(cv => { const w = cv.clientWidth; if (!w) return; if (cv.width !== w) cv.width = w; const g = cv.getContext('2d'), h = cv.height, mid = h / 2, live = cv.classList.contains('live'), amp = live ? h * 0.42 : h * 0.06;
+    g.clearRect(0, 0, w, h); g.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac') || '#4c9bff'; g.globalAlpha = .85; g.lineWidth = 1.5; g.beginPath();
+    for (let i = 0; i <= 64; i++) { const k = i / 64, y = mid + amp * (Math.sin(k * 22 + t * 9) * .5 + Math.sin(k * 57 - t * 23) * .3 * (live ? 1 : .3) + Math.sin(k * 7 + t * 3) * .2) * Math.sin(k * Math.PI); i ? g.lineTo(k * w, y) : g.moveTo(0, y); }
+    g.stroke(); });
+  requestAnimationFrame(waves); })();
+let intelTab = 0, intelOpen = -1, intelBusy = false, intelErr = '';
+const auState = () => S.place ? Occasions.stateOf(S.place.lat, S.place.lon) : null;
+const stName = s => ({ vic: 'Victoria', nsw: 'New South Wales', qld: 'Queensland', sa: 'South Australia', wa: 'Western Australia', tas: 'Tasmania', act: 'the ACT', nt: 'the Northern Territory' }[s] || 'Australia');
+async function loadIntel(force) {
+  if (!VoiceKeys.gemini || intelBusy) return;
+  intelBusy = true; intelErr = ''; renderIntel();
+  try { await Intel.get(S.place ? S.place.name : 'Melbourne', stName(auState()), force); } catch (e) { intelErr = String(e.message || e).slice(0, 90); }
+  intelBusy = false; renderIntel();
+}
+function renderIntel() {
+  const el = $('#p-intel'); if (!el) return;
+  pIndex = 0;
+  const f = Store.get('intel', null), key = !!VoiceKeys.gemini;
+  const head = panel('Intel // broadcast', 'TX-' + (f ? String(f.local.length + f.national.length + f.world.length).padStart(2, '0') : '--'),
+    `<div data-console="news">${consoleHtml('news', '▶ NEWS BROADCAST')}</div>
+     <div class="m" style="display:flex;gap:8px;margin-top:8px;font-size:9px;letter-spacing:1.5px;color:var(--faint)"><span style="flex:1">${!key ? 'ADD A FREE GEMINI KEY IN SETTINGS › VOICE TO RECEIVE HEADLINES' : intelBusy ? 'ACQUIRING SIGNAL…' : intelErr ? 'NO SIGNAL: ' + esc(intelErr) : f ? 'SYNC ' + Math.round((Date.now() - f.at) / 60000) + 'M AGO · VIA GOOGLE SEARCH' : ''}</span>${key ? '<a href="#" id="intelSync" style="color:var(--ac)">↻ RESYNC</a>' : ''}</div>`);
+  let body = '';
+  if (f) {
+    const tabs = [['LOCAL', stName(auState()).toUpperCase(), f.local], ['NATIONAL', 'AUSTRALIA', f.national], ['WORLD', 'LONG RANGE', f.world]].filter(t => t[2].length || t[0] !== 'LOCAL');
+    intelTab = Math.min(intelTab, tabs.length - 1); const [n, sub, items] = tabs[intelTab];
+    body = panel(`${n} // ${sub}`, String(items.length).padStart(2, '0') + ' RX',
+      `<div class="itabs">${tabs.map((t, i) => `<button data-itab="${i}" aria-pressed="${i === intelTab}">${t[0]} ${t[2].length}</button>`).join('')}</div>` +
+      (items.length ? items.slice(0, 8).map((x, i) => `<div class="irow" data-irow="${i}"><span class="ix">${String(i + 1).padStart(2, '0')}</span><div><div class="it${intelOpen === i ? ' open' : ''}">${esc(x.title)}</div><div class="im">${esc(x.source)} · T-${Math.max(0, Math.round((Date.now() - x.at) / HOUR))}H</div>${intelOpen === i ? `${x.summary ? `<div class="is">${esc(x.summary)}</div>` : ''}${x.url ? `<a class="io" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">OPEN FULL REPORT ›</a>` : ''}` : ''}</div></div>`).join('') : '<div class="im" style="padding:10px 0">NO TRAFFIC ON THIS CHANNEL</div>'));
+  }
+  el.innerHTML = `<div class="col">${head}${body}</div>`;
+  mountPanels(el);
+  const f2 = Store.get('intel', null);
+  if (key && !intelBusy && !intelErr && !document.hidden && (!f2 || Date.now() - f2.at > 30 * 60000)) loadIntel(false);
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  const it = t.closest('[data-itab]'); if (it) { intelTab = +it.dataset.itab; intelOpen = -1; renderIntel(); return; }
+  const ir = t.closest('[data-irow]'); if (ir && !t.closest('a')) { const i = +ir.dataset.irow; intelOpen = intelOpen === i ? -1 : i; renderIntel(); return; }
+  if (t.closest('#intelSync')) { e.preventDefault(); loadIntel(true); return; }
+  const bc = t.closest('[data-bc]');
+  if (bc) {
+    const k = bc.dataset.bc;
+    if (Broadcast.kind === k) return Broadcast.stop();
+    const city = S.place ? S.place.name : 'your sector';
+    if (k === 'day' && S.w) {
+      const b = Briefing.text(S.w, city), alerts = Alerts.model(S.w, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w));
+      Broadcast.start('day', Voicebox.dayPrompt(S.w, city, alerts), b.body.split(/(?<=[.!?])\s+(?=[A-Z])/).reduce((a, x, i) => (i % 2 ? a[a.length - 1] += ' ' + x : a.push(x), a), []), { search: true });
+    } else if (k === 'news') {
+      const f = Store.get('intel', null);
+      const fb = f ? [Voice.line('NEWS', 'INTRO') || 'Transmission incoming.', ...f.local.slice(0, 3).map(x => x.title), ...f.national.slice(0, 3).map(x => x.title), ...f.world.slice(0, 3).map(x => x.title), Voice.line('NEWS', 'OUTRO') || 'End of transmission.'] : [Voice.line('NEWS', 'EMPTY') || 'No transmissions.'];
+      Broadcast.start('news', f ? Voicebox.newsPrompt(f, city, stName(auState())) : null, fb);
+    }
+    return;
+  }
+  if (t.closest('#stVoiceTest')) Broadcast.start('test', null, [Voice.line('NEWS', 'INTRO') || 'Skyfall online.', 'Voice check complete. Signal is clean.']);
+});
+document.addEventListener('change', e => { if (e.target.id === 'kGemini' || e.target.id === 'kTts') { VoiceKeys.set($('#kGemini').value, $('#kTts').value); Store.del('intel'); } });
+document.addEventListener('click', e => { if (e.target.closest('#dock [data-tab]')) setTimeout(() => { if (tabKey(S.tab) === 'NEWS') renderIntel(); }, 350); });
+boot();
+}

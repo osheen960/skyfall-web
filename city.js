@@ -449,8 +449,9 @@ const Festive = (() => {
     const la = lampA();
     [0.30, 0.21, 0.12].forEach((k, si) => { const y = e.ground - e.H * k, segW = e.W / 3;
       for (let sg = 0; sg < 3; sg++) { const x0 = sg * segW, depth = 14 + si * 3; stroke(rgba(BLACK, 0.35 + 0.2 * e.dark), 0.8); swag(x0, y, x0 + segW, depth);
-        for (let q = 1; q < 9; q++) { const f = q / 9, x = x0 + segW * f, yy = sag(y, f, depth) + 2, col = cols[(q + sg + si) % cols.length], tw = 0.65 + 0.35 * Math.sin(e.t * 2.2 + q * 1.7 + si + sg * 3);
-          c.fillStyle = rgba(col, 0.55 + 0.45 * Math.max(la, 0.2) * tw); c.beginPath(); c.arc(x, yy, 2.2, 0, 7); c.fill(); glow(x, yy, 9, col, 0.75 * la * tw); } } });
+        for (let q = 1; q < 9; q++) { const f = q / 9, x = x0 + segW * f, yy = sag(y, f, depth) + 2, col = cols[(q + sg + si) % cols.length];
+          const ch = Math.max(0, Math.cos((q + sg * 9 - e.t * 5 + si * 2) * 0.7)) ** 2, tw = 0.35 + 0.45 * ch + 0.2 * Math.sin(e.t * 2.2 + q * 1.7 + si + sg * 3);
+          glow(x, yy, 12, col, (0.25 + 0.75 * la) * tw); c.fillStyle = rgba(lerp(col, WHITE, 0.55 * tw), 0.6 + 0.4 * tw); c.beginPath(); c.arc(x, yy, 1.6, 0, 7); c.fill(); } } });
   }
   function bunting(cols) {
     const y = e.ground - e.H * 0.24, depth = 22, n = 22, sw = Math.sin(e.t * 1.6) * (1 + e.windKmh / 15) * e.windX;
@@ -465,9 +466,12 @@ const Festive = (() => {
       const cx = e.W * (0.12 + 0.76 * rnd(seed)), cy = e.H * (0.12 + 0.28 * rnd(seed + 1)), col = cols[(seed & 0x7fffffff) % cols.length];
       if (f < 0.22) { const g = f / 0.22, y = e.ground + (cy - e.ground) * (1 - (1 - g) * (1 - g)); c.fillStyle = rgba(H2('#FFE2A8'), 0.8 * vis); c.beginPath(); c.arc(cx, y, 1.6, 0, 7); c.fill(); }
       else { const g = (f - 0.22) / 0.78, r = (40 + 30 * rnd(seed + 2)) * (1 - (1 - g) ** 3), a = (1 - g) * vis;
-        for (let i = 0; i < 26; i++) { const ang = i * 2 * Math.PI / 26 + rnd(seed + 3), x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r + g * g * 22;
-          c.fillStyle = rgba(col, a); c.beginPath(); c.arc(x, y, 1.7, 0, 7); c.fill();
-          stroke(rgba(col, a * 0.35), 1); c.beginPath(); c.moveTo(cx + Math.cos(ang) * r * 0.7, cy + Math.sin(ang) * r * 0.7 + g * g * 15); c.lineTo(x, y); c.stroke(); }
+        const g0 = Math.max(0, g - 0.07), r0 = (40 + 30 * rnd(seed + 2)) * (1 - (1 - g0) ** 3);
+        for (let i = 0; i < 26; i++) { const ang = i * 2 * Math.PI / 26 + rnd(seed + 3) + (rnd(seed * 31 + i) - 0.5) * 0.12, sp = 0.85 + 0.3 * rnd(seed * 17 + i);
+          const x = cx + Math.cos(ang) * r * sp, y = cy + Math.sin(ang) * r * sp + g * g * 26, x0 = cx + Math.cos(ang) * r0 * sp, y0 = cy + Math.sin(ang) * r0 * sp + g0 * g0 * 26;
+          stroke(rgba(col, a * 0.7), 1.4); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x, y); c.stroke();
+          const fl = g > 0.55 ? (rnd(Math.floor(e.t * 30) + i * 7) > 0.5 ? 1 : 0.25) : 1;
+          c.fillStyle = rgba(lerp(col, WHITE, 0.6), a * fl); c.beginPath(); c.arc(x, y, 1.3, 0, 7); c.fill(); glow(x, y, 5, col, 0.5 * a * fl); }
         if (g < 0.25) glow(cx, cy, 60, col, 0.35 * vis * (1 - g / 0.25)); } }
   }
   function lanterns(col) {
@@ -487,7 +491,12 @@ const Festive = (() => {
     c.font = '700 13px sans-serif'; if ('letterSpacing' in c) c.letterSpacing = '3px';
     const tw = c.measureText(text).width, w = tw + 28, h = 30, x = (e.W - w) / 2, y = e.ground - e.H * 0.2, red = H2('#D8232A');
     c.fillStyle = rgba(NIGHT, 0.82); c.fillRect(x, y, w, h); stroke(rgba(red, 0.9), 1.5); c.strokeRect(x, y, w, h); glow(e.W / 2, y + h / 2, w * 0.6, red, 0.18 * (0.5 + 0.5 * lampA()));
-    c.fillStyle = rgba(H2('#F4F4F4'), 0.95); c.textAlign = 'center'; c.fillText(text, e.W / 2 + 6, y + h / 2 + 4.5); c.textAlign = 'start'; if ('letterSpacing' in c) c.letterSpacing = '0px';
+    const fl = rnd(Math.floor(e.t * 12)) > 0.93 ? 0.55 : 1;
+    stroke(rgba(red, 0.08), 1); for (let sy = y + 2; sy < y + h; sy += 3) { c.beginPath(); c.moveTo(x + 2, sy); c.lineTo(x + w - 2, sy); c.stroke(); }
+    stroke(rgba(H2('#FF4A50'), 0.9), 2); c.beginPath(); c.moveTo(x - 3, y + 4); c.lineTo(x - 3, y - 3); c.lineTo(x + 4, y - 3); c.moveTo(x + w + 3, y + h - 4); c.lineTo(x + w + 3, y + h + 3); c.lineTo(x + w - 4, y + h + 3); c.stroke();
+    c.shadowColor = 'rgba(255,58,64,.9)'; c.shadowBlur = 6;
+    c.fillStyle = rgba(H2('#F4F4F4'), 0.95 * fl); c.textAlign = 'center'; c.fillText(text, e.W / 2 + 6, y + h / 2 + 4.5); c.textAlign = 'start'; if ('letterSpacing' in c) c.letterSpacing = '0px';
+    c.shadowBlur = 0; c.shadowColor = 'transparent';
     c.fillStyle = rgba(red); c.beginPath(); c.arc(x + 11, y + h / 2, 4, 0, 7); c.fill(); c.fillStyle = '#141414'; c.beginPath(); c.arc(x + 11, y + h / 2, 1.3, 0, 7); c.fill();
   }
   function tree() {
@@ -532,8 +541,9 @@ const Festive = (() => {
   function pumpkins() {
     const la = lampA();
     [0.08, 0.22, 0.7, 0.86, 0.94].forEach((fx, k) => { const x = e.W * fx, y = e.ground + e.H * (0.05 + 0.02 * (k % 2)), r = 9 + 4 * (k % 3);
-      c.fillStyle = rgba(lerp(H2('#FF7A1F'), H2('#5A2A0A'), e.dark * 0.6)); oval(x - r * 1.2, y - r, x + r * 1.2, y);
-      stroke(rgba(BLACK, 0.3), 0.8); c.beginPath(); c.moveTo(x, y - r); c.lineTo(x, y); c.stroke(); c.fillStyle = rgba(lerp(H2('#3F7A3F'), H2('#102010'), e.dark)); c.fillRect(x - 1.2, y - r - 4, 2.4, 4);
+      c.fillStyle = rgba(lerp(H2('#3A1A08'), H2('#140804'), e.dark)); oval(x - r * 1.2, y - r, x + r * 1.2, y);
+      stroke(rgba(H2('#FF8A2A'), 0.95), 1.5); c.beginPath(); c.ellipse(x, y - r / 2, r * 1.2, r / 2, 0, 0, 7); c.stroke(); c.beginPath(); c.ellipse(x, y - r / 2, r * 0.55, r / 2, 0, 0, 7); c.stroke();
+      glow(x, y - r / 2, r * 2, H2('#FF7A1F'), 0.25 + 0.25 * la); c.fillStyle = rgba(lerp(H2('#3F7A3F'), H2('#102010'), e.dark)); c.fillRect(x - 1.2, y - r - 4, 2.4, 4);
       if (la > 0.05) { c.fillStyle = rgba(GOLD, 0.9 * la); [[-0.55, -0.25, -0.4], [0.25, 0.55, 0.4]].forEach(([a, b, m]) => { c.beginPath(); c.moveTo(x + r * a, y - r * 0.6); c.lineTo(x + r * b, y - r * 0.6); c.lineTo(x + r * m, y - r * 0.8); c.closePath(); c.fill(); });
         c.fillRect(x - r * 0.5, y - r * 0.35, r, r * 0.1); glow(x, y - r * 0.5, r * 2.5, H2('#FF9A3D'), 0.4 * la); } });
   }
@@ -548,12 +558,74 @@ const Festive = (() => {
       c.fillStyle = rgba(lerp(cols[k % cols.length], NIGHT, e.dark * 0.55)); oval(x - 4, y - 11, x + 4, y);
       stroke(rgba(WHITE, 0.6 * (1 - e.dark * 0.5)), 1.2); c.beginPath(); c.moveTo(x - 3.5, y - 5); c.lineTo(x + 3.5, y - 5); c.stroke(); }
   }
+
+  function holotree() {
+    const la = lampA(), cx = e.W * 0.14, base = e.ground + e.H * 0.055, h = e.H * 0.22, R = h * 0.36, teal = H2('#3DFFD0');
+    stroke(rgba(teal, 0.55), 1.2); c.beginPath(); c.ellipse(cx, base, R * 0.8, 4, 0, 0, 7); c.stroke(); glow(cx, base, R * 1.1, teal, 0.18 + 0.2 * la);
+    const gr = c.createLinearGradient(cx, base - h, cx, base); gr.addColorStop(0, rgba(teal, 0)); gr.addColorStop(1, rgba(teal, 0.1));
+    c.fillStyle = gr; c.beginPath(); c.moveTo(cx, base - h); c.lineTo(cx - R, base - 2); c.lineTo(cx + R, base - 2); c.closePath(); c.fill();
+    const cols = ['#FFD23D', '#3DFFD0', '#E23636', '#2FD86A', '#F4F4F4'].map(H2), n = 110;
+    for (let pass = 0; pass < 2; pass++) for (let k = 0; k < n; k++) {
+      const t = k / n, ang = t * 7.5 * 2 * Math.PI + e.t * 1.1, dp = Math.sin(ang); if ((pass === 0) !== (dp < 0)) continue;
+      const r = (1 - t) * R, x = cx + Math.cos(ang) * r, y = base - 4 - t * (h - 10), b = 0.25 + 0.75 * (dp + 1) / 2, col = cols[Math.floor(k / 6) % cols.length];
+      glow(x, y, 5 + 4 * b, col, (0.3 + 0.6 * la) * b); c.fillStyle = rgba(lerp(col, WHITE, 0.5), 0.4 + 0.6 * b); c.beginPath(); c.arc(x, y, 0.8 + 0.9 * b, 0, 7); c.fill();
+    }
+    const sy = base - h, pu = 0.8 + 0.2 * Math.sin(e.t * 2.4); glow(cx, sy, 26 * pu, GOLD, 0.45 + 0.4 * la);
+    stroke(rgba(H2('#FFF2C0'), 0.9), 1.2); c.beginPath(); c.moveTo(cx - 14 * pu, sy); c.lineTo(cx + 14 * pu, sy); c.moveTo(cx, sy - 18 * pu); c.lineTo(cx, sy + 10 * pu); c.stroke();
+    stroke(rgba(H2('#FFF2C0'), 0.9), 0.8); c.beginPath(); c.moveTo(cx - 6, sy - 6); c.lineTo(cx + 6, sy + 6); c.moveTo(cx - 6, sy + 6); c.lineTo(cx + 6, sy - 6); c.stroke();
+  }
+  function holopoppy() {
+    const cx = e.W * 0.5, cy = e.H * 0.24, R = Math.min(e.W, e.H) * 0.12, red = H2('#FF2A35');
+    const fl = (rnd(Math.floor(e.t * 9) + 5) > 0.95 ? 0.5 : 1) * (0.85 + 0.15 * Math.sin(e.t * 1.3));
+    glow(cx, cy, R * 2.4, red, 0.16 * fl);
+    c.save(); c.translate(cx, cy); c.rotate(Math.sin(e.t * 0.3) * 6 * Math.PI / 180); c.translate(-cx, -cy);
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4, px = cx + Math.cos(a) * R * 0.48, py = cy + Math.sin(a) * R * 0.48;
+      c.fillStyle = rgba(red, 0.1 * fl); c.beginPath(); c.arc(px, py, R * 0.62, 0, 7); c.fill();
+      stroke(rgba(red, 0.85 * fl), 1.6); c.beginPath(); c.arc(px, py, R * 0.62, 0, 7); c.stroke(); stroke(rgba(H2('#FF8A90'), 0.5 * fl), 0.7); c.beginPath(); c.arc(px, py, R * 0.45, 0, 7); c.stroke(); }
+    c.fillStyle = rgba(NIGHT, 0.85); c.beginPath(); c.arc(cx, cy, R * 0.22, 0, 7); c.fill();
+    stroke(rgba(H2('#3DFF9A'), 0.8 * fl), 1.4); c.beginPath(); c.arc(cx, cy, R * 0.22, 0, 7); c.stroke();
+    c.beginPath(); for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.moveTo(cx + Math.cos(a) * R * 0.08, cy + Math.sin(a) * R * 0.08); c.lineTo(cx + Math.cos(a) * R * 0.2, cy + Math.sin(a) * R * 0.2); } c.stroke();
+    c.restore();
+    stroke(rgba(red, 0.07 * fl), 1); for (let y = cy - R * 1.2; y < cy + R * 1.2; y += 3) { c.beginPath(); c.moveTo(cx - R * 1.2, y); c.lineTo(cx + R * 1.2, y); c.stroke(); }
+    const sw = cy - R * 1.2 + ((e.t * 0.35) % 1) * R * 2.4; stroke(rgba(H2('#FF8A90'), 0.35 * fl), 2); c.beginPath(); c.moveTo(cx - R * 1.1, sw); c.lineTo(cx + R * 1.1, sw); c.stroke();
+    stroke(rgba(red, 0.25 * fl), 1); c.beginPath(); c.moveTo(cx, cy + R * 0.9); c.lineTo(cx, e.ground); c.stroke();
+  }
+  const FC = {};
+  function form(name, n) {
+    const key = name + '/' + n; if (FC[key]) return FC[key];
+    const poly = (pts, col) => { const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]), lens = segs.map(([p, q]) => Math.hypot(q[0] - p[0], q[1] - p[1])), tot = lens.reduce((a, b) => a + b, 0);
+      return Array.from({ length: n }, (_, i) => { let d = tot * i / n, k = 0; while (k < lens.length - 1 && d > lens[k]) { d -= lens[k]; k++; } const [p, q] = segs[k], f = lens[k] ? d / lens[k] : 0; return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, col]; }); };
+    const gold = GOLD, red = H2('#FF3A40'), green = H2('#2FD86A'), white = H2('#F4F4F4'), P = Math.PI; let out;
+    if (name === 'tree') out = poly([[0, -1], [0.75, 0.55], [0.15, 0.55], [0.15, 0.85], [-0.15, 0.85], [-0.15, 0.55], [-0.75, 0.55]], green);
+    else if (name === 'gift') out = poly([[-0.8, -0.3], [0.8, -0.3], [0.8, 0.85], [-0.8, 0.85]], red).map((t, i) => i % 4 === 0 ? [0, -0.3 + 1.15 * (i / n), gold] : t);
+    else if (name === 'heart') out = Array.from({ length: n }, (_, i) => { const t = i * 2 * P / n; return [0.06 * 16 * Math.sin(t) ** 3, -0.06 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)), red]; });
+    else if (name === 'lantern') out = Array.from({ length: n }, (_, i) => { const t = i * 2 * P / n; return [Math.cos(t) * 0.75, Math.sin(t) * 0.95, red]; });
+    else if (name === 'crescent') out = Array.from({ length: n }, (_, i) => { const a = -P * 0.8 + (i / (n - 1)) * P * 1.6 + P; return i % 2 === 0 ? [Math.cos(a) * 0.9 + 0.2, Math.sin(a) * 0.9, gold] : [Math.cos(a) * 0.6 - 0.05, Math.sin(a) * 0.6, gold]; });
+    else if (name === 'cross') { const st = [[0, -0.95], [0.1, 0.9], [-0.55, -0.05], [0.55, 0.1], [0.28, 0.35]];
+      out = Array.from({ length: n }, (_, i) => { const [sx, sy] = st[i % 5], k = Math.floor(i / 5), a = k * 1.3, r = i % 5 === 4 ? 0.04 : 0.04 + 0.03 * (k % 3); return [sx + Math.cos(a) * r, sy + Math.sin(a) * r, white]; }); }
+    else if (name === 'year') { const now = new Date(), yr = String(now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear());
+      const F = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001111' }, pts = [];
+      [...yr].forEach((ch, ci) => { const g = F[ch]; for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (g[r * 3 + q] === '1') pts.push([((ci * 4 + q) - (yr.length * 4 - 1) / 2) * 0.13, (r - 2) * 0.2]); });
+      out = Array.from({ length: n }, (_, i) => { const [x, y] = pts[i % pts.length], k = Math.floor(i / pts.length); return [x + k * 0.015, y + k * 0.015, gold]; }); }
+    else if (name === 'diya') out = poly([[-0.9, 0.2], [0.9, 0.2], [0.5, 0.6], [-0.5, 0.6]], AMBER).map((t, i) => i % 3 === 0 ? [0.15 * Math.sin(i), -0.1 - 0.7 * (i / n), H2('#FF9A3D')] : t);
+    else out = poly(Array.from({ length: 10 }, (_, k) => { const r = k % 2 ? 0.42 : 1, a = -P / 2 + k * P / 5; return [Math.cos(a) * r, Math.sin(a) * r]; }), gold);
+    return (FC[key] = out);
+  }
+  function drones(shapes) {
+    const vis = Math.max(0, Math.min(1, (e.dark - 0.4) / 0.35)) * (1 - 0.6 * e.rain) * (1 - 0.6 * e.fog); if (vis < 0.02 || !shapes.length) return;
+    const n = 56, hold = 7, tr = 2.5, cyc = e.t / (hold + tr), i0 = Math.floor(cyc), ph = (cyc - i0) * (hold + tr), L = shapes.length;
+    const A = form(shapes[((i0 % L) + L) % L], n), B = form(shapes[(((i0 + 1) % L) + L) % L], n);
+    const m = ph < hold ? 0 : ((ph - hold) / tr) ** 2 * (3 - 2 * ((ph - hold) / tr)), cx = e.W * 0.62, cy = e.H * 0.2, sc = Math.min(e.W, e.H) * 0.15;
+    for (let i = 0; i < n; i++) { const [ax, ay, ac] = A[i], [bx, by, bc] = B[i];
+      const x = cx + (ax + (bx - ax) * m) * sc + Math.sin(e.t * 1.7 + i) * 1.2, y = cy + (ay + (by - ay) * m) * sc + Math.cos(e.t * 1.3 + i) * 1.2, col = lerp(ac, bc, m);
+      glow(x, y, 7, col, 0.55 * vis); c.fillStyle = rgba(lerp(col, WHITE, 0.5), 0.9 * vis); c.beginPath(); c.arc(x, y, 1.4, 0, 7); c.fill(); }
+  }
   return {
     draw(ctx, fx, day, env) {
       c = ctx; e = env;
       for (const f of fx || []) {
         const i = f.indexOf(':'), name = i < 0 ? f : f.slice(0, i), arg = i < 0 ? '' : f.slice(i + 1), cols = arg.split(',').filter(s => /^#/.test(s.trim())).map(s => H2(s.trim()));
-        ({ lights: () => lights(cols), bunting: () => bunting(cols), fireworks: () => fireworks(cols), lanterns: () => lanterns(cols[0] || H2('#E23636')), poppies, sign: () => sign(arg), tree, sleigh, crescent, menorah: () => menorah(day || 0), diyas, pumpkins, bats, eggs }[name] || (() => {}))();
+        ({ lights: () => lights(cols), bunting: () => bunting(cols), fireworks: () => fireworks(cols), lanterns: () => lanterns(cols[0] || H2('#E23636')), poppies, sign: () => sign(arg), tree, sleigh, crescent, menorah: () => menorah(day || 0), diyas, pumpkins, bats, eggs, holotree, holopoppy, drones: () => drones(arg ? arg.split(',') : ['star']) }[name] || (() => {}))();
       }
     },
   };
