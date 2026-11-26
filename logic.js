@@ -480,7 +480,7 @@ const Advisor = {
     if (aqi != null && aqi > 100) A('MASK', 'P2 mask', `AQI ${aqi}`, 8, [`AQI ${aqi}. The air has texture today. Gross.`, `AQI ${aqi}: breathing, now with extra chunks.`]);
     // Personality: one voiced line per item (Android Advisor.loadout does the same).
     const vars = { tmax: R(tMax), tmin: R(tMin), pop, time: wetT, mm: f1(mm), uv: R(uv), uvEnd, gust: R(gust), feel: R(feelMin) };
-    out.forEach(a => { const l = Voice.line('LOADOUT', a.gear); if (l) a.quips = [Voice.fill(l, vars)]; });
+    out.forEach(a => { const l = Voice.line('LOADOUT', a.gear); if (l) a.quips = [Voice.fill(l, vars), ...(Voice.id === 'deadpan' ? a.quips : [])]; });
     return { date, next, items: out.sort((a, b) => b.pri - a.pri) };
   },
 

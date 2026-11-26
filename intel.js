@@ -108,8 +108,11 @@ const Broadcast = {
     this.stop(); const tok = ++this._tok;
     this._set({ kind, preparing: true, status: 'ENCODING TRANSMISSION…', adaptive: false });
     let lines = fallback;
-    if (VoiceKeys.gemini && prompt) {
-      try { lines = await Voicebox.write(prompt[0], prompt[1], opts); this.adaptive = true; } catch (e) { this.status = 'SCRIPT UPLINK FAILED (' + String(e.message).slice(0, 60) + ') · BUILT-IN VOICE'; }
+    if (prompt) {
+      // Always written fresh; never just read the on-screen text back.
+      const hold = () => { this._set({ preparing: false }); setTimeout(() => { if (tok === this._tok && !this.playing) this._set({ kind: null }); }, 6000); };
+      if (!VoiceKeys.gemini) { this.status = 'NO SCRIPT UPLINK · ADD A FREE GEMINI KEY IN SETTINGS › VOICE'; return hold(); }
+      try { lines = await Voicebox.write(prompt[0], prompt[1], opts); this.adaptive = true; } catch (e) { this.status = 'SCRIPT UPLINK FAILED: ' + String(e.message).slice(0, 80); return hold(); }
     }
     if (tok !== this._tok) return;
     let clips = lines.map(() => null);
@@ -132,5 +135,20 @@ const Broadcast = {
       u.voice = vs.find(v => /natural|neural|online|google/i.test(v.name)) || vs[0] || null; u.lang = 'en-GB'; u.rate = 1; u.pitch = 1;
       u.onend = u.onerror = () => r(); speechSynthesis.speak(u);
     });
+  },
+};
+
+/* Fresh daily loadout lines (Gemini, persona voice, today's numbers). Cached; renders on next paint. */
+const LoFresh = {
+  busy: {},
+  key(lo, p) { return 'lo_' + p + '_' + lo.date + '_' + lo.items.map(i => i.gear + i.reason).join('|').replace(/[^A-Za-z0-9|]/g, '').slice(0, 160); },
+  get(lo, p) {
+    if (!VoiceKeys.gemini || !lo.items.length) return null;
+    const k = this.key(lo, p), c = Store.get(k, null); if (c) return c;
+    if (this.busy[k]) return null; this.busy[k] = true;
+    const sys = `You write the one-line gear tips on the Skyfall weather console's loadout tiles.\n${Voicebox.style()}\nRules: one line per item, 6 to 16 words, in the persona's voice and humour, specific to today's numbers given. Vary wording and jokes; never generic. No emojis, no markdown. Use only the numbers given. Return ONLY a JSON object mapping each item code to its line.`;
+    const pr = `Date: ${lo.date}.\nItems:\n` + lo.items.map(i => `${i.gear}: ${i.title} - ${i.reason}`).join('\n');
+    Voicebox.gemini(sys, pr, { temp: 1 }).then(t => { const m = t.match(/\{[\s\S]*\}/); if (m) { Store.set(k, JSON.parse(m[0])); window.dispatchEvent(new Event('skyfall:refresh')); } }).catch(() => {}).finally(() => { delete this.busy[k]; });
+    return null;
   },
 };
