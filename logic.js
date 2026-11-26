@@ -86,7 +86,7 @@ const OM = {
   HOURLY: 'temperature_2m,precipitation_probability,weather_code,is_day,visibility,uv_index,dew_point_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,apparent_temperature,cloud_cover,pressure_msl',
   DAILY: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max',
   forecastUrl(lat, lon) {
-    return `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=${this.CURRENT}&hourly=${this.HOURLY}&daily=${this.DAILY}&timezone=auto&forecast_days=10&wind_speed_unit=kmh`;
+    return `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=${this.CURRENT}&hourly=${this.HOURLY}&daily=${this.DAILY}&minutely_15=precipitation&past_minutely_15=2&forecast_minutely_15=2&timezone=auto&forecast_days=10&wind_speed_unit=kmh`;
   },
   airUrl(lat, lon) {
     return `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=us_aqi,pm2_5,pm10,ozone&hourly=us_aqi&timezone=auto&forecast_days=5`;
@@ -103,6 +103,12 @@ const OM = {
       isDay: c.is_day === 1, precipitation: c.precipitation || 0, code: c.weather_code, cloudCover: c.cloud_cover,
       pressure: c.pressure_msl, windSpeed: c.wind_speed_10m || 0, windDirection: c.wind_direction_10m || 0, windGusts: c.wind_gusts_10m || 0,
     };
+    // Nowcast: Open-Meteo's code often says "overcast" while it rains. Rain in the last 30 / next 15 minutes upgrades it.
+    if (current.code < 50) {
+      let mm = current.precipitation || 0; const m = j.minutely_15;
+      if (m && m.time) m.time.forEach((t, i) => { const d = (T(t) - current.time) / 60000; if (d >= -30 && d <= 15) mm = Math.max(mm, ((m.precipitation || [])[i] || 0) * 4); });
+      if (mm >= 0.1) { current.code = mm >= 4 ? 63 : mm >= 0.8 ? 61 : 51; current.precipitation = Math.max(current.precipitation || 0, mm); }
+    }
     const h = j.hourly, v = (k, i, d = null) => (h[k] && h[k][i] != null ? h[k][i] : d);
     const startHour = current.time - (current.time % HOUR);
     const hourly = h.time.map((t, i) => ({
