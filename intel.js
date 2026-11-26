@@ -87,25 +87,6 @@ Rules:
     const L = (tag, l, n) => (l || []).slice(0, n).map(x => `[${tag}] ${x.title} :: ${(x.summary || '').slice(0, 220)}`).join('\n');
     return [sys, `Listener: ${city}, ${state || 'Australia'}. Local time ${new Date().toTimeString().slice(0, 5)}.\nStories:\n` + [L('LOCAL', f.local, 4), L('NATIONAL', f.national, 4), L('WORLD', f.world, 5)].filter(Boolean).join('\n')];
   },
-  dayPrompt(w, city, alerts) {
-    const sys = `You write and host the Skyfall daily briefing: a spoken round-up of the listener's whole day.\n${this.style()}\n${this.RULES}- Structure: a time-appropriate greeting; any warnings or hazards first (official warnings, floods, fires, major traffic or public transport disruption, emergencies near ${city}) with what to do; then the day's weather arc (morning, afternoon, evening) with what to wear or carry; then a short verdict for each of the listener's activities with the best time; then a sign-off.\n- You may use Google Search ONLY to check for current official warnings, floods, fires, major traffic incidents or transport disruptions near ${city} today. Weather numbers must come from the data given, never from search.\n- If there are no warnings or hazards, say the board is clear in one line.\n- Under 260 words.`;
-    const c = w.current, t0 = dkey(c.time), nowH = c.time - (c.time % HOUR);
-    const hrs = w.hourly.filter(h => dkey(h.time) === t0 && h.time >= nowH), hr = h => new Date(h.time).getUTCHours();
-    const seg = (n, a, b) => { const hs = hrs.filter(h => hr(h) >= a && hr(h) <= b); if (!hs.length) return null;
-      const mx = k => Math.max(...hs.map(h => h[k] || 0)), cnt = {}; hs.forEach(h => cnt[h.code] = (cnt[h.code] || 0) + 1);
-      return `${n}: ${Math.round(Math.min(...hs.map(h => h.temperature)))}-${Math.round(mx('temperature'))}C, rain chance up to ${mx('pop')}%, rain ${hs.reduce((s, h) => s + (h.precip || 0), 0).toFixed(1)}mm, wind ${Math.round(mx('wind'))}km/h gusting ${Math.round(mx('gust'))}, UV max ${Math.round(mx('uv'))}, ${Codes.label(+Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0])}`; };
-    const d = w.daily[0], hm = ms => new Date(ms).toISOString().slice(11, 16);
-    const acts = SkyPrefs.activities.map(id => Activities.find(id)).filter(Boolean).map(a => { const b = Activities.day(w, t0, a).best;
-      return b ? `${a.name}: best at ${hm(b.tee)} score ${b.score}/100, ${Math.round(b.tMin)}-${Math.round(b.tMax)}C, rain ${b.pop}%, wind ${Math.round(b.wind)} gust ${Math.round(b.gust)}${b.limiter ? ', limiter ' + b.limiter : ''}` : `${a.name}: no good window today`; }).join('\n');
-    const p = [`Listener: ${city}. Now ${hm(c.time)}, ${t0}.`,
-      `Now: ${Math.round(c.temperature)}C feels ${Math.round(c.feelsLike)}C, ${Codes.label(c.code)}, humidity ${c.humidity}%, wind ${Math.round(c.windSpeed)} gusting ${Math.round(c.windGusts)}km/h.`,
-      d ? `Today: low ${Math.round(d.min)}C high ${Math.round(d.max)}C, rain chance ${d.popMax || 0}%, rain total ${(d.precipSum || 0).toFixed(1)}mm, UV max ${Math.round(d.uvMax || 0)}, sunset ${hm(d.sunset)}.` : '',
-      seg('Morning', 5, 11), seg('Afternoon', 12, 17), seg('Evening', 18, 23),
-      SkyState.air?.usAqi != null ? `Air quality: US AQI ${SkyState.air.usAqi}.` : '',
-      'Model warnings: ' + (alerts.map(a => `${Alerts.name(a.level)} ${a.title} ${a.body.slice(0, 160)}`).join('; ') || 'none'),
-      'Activities:\n' + (acts || 'none chosen')].filter(Boolean).join('\n');
-    return [sys, p];
-  },
 };
 
 /* Headlines via Gemini + Google Search (browser can't read RSS). Cached 30 minutes. */
