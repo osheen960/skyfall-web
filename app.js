@@ -722,7 +722,7 @@ function themeCard(t) {
   const d = t.shape === 'chamfer' ? `M${c} .5H${W - .5}V${H - c}L${W - c} ${H - .5}H.5V${c}Z` : ['round', 'outline', 'riveted'].includes(t.shape)
     ? `M${r + .5} .5H${W - r - .5}A${r} ${r} 0 0 1 ${W - .5} ${r + .5}V${H - r - .5}A${r} ${r} 0 0 1 ${W - r - .5} ${H - .5}H${r + .5}A${r} ${r} 0 0 1 .5 ${H - r - .5}V${r + .5}A${r} ${r} 0 0 1 ${r + .5} .5Z` : `M.5 .5H${W - .5}V${H - .5}H.5Z`;
   const sw = [p.accent, p.accent2, p.good, p.alert].map((col, i) => `<circle cx="${12 + i * 14}" cy="${H / 2}" r="5" fill="${col}"/>`).join('');
-  return `<button class="st-theme" data-theme="${t.id}" aria-pressed="${on}" style="background:${p.bg};color:${p.ink};border-color:${rgba(p.ink, .15)}">
+  return `<button class="st-theme" data-skin="${t.id}" aria-pressed="${on}" style="background:${p.bg};color:${p.ink};border-color:${rgba(p.ink, .15)}">
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="${rgba(p.ink, .06)}" stroke="${t.shape === 'outline' ? p.ink : rgba(p.accent, .7)}" stroke-width="${t.shape === 'outline' ? 2 : 1}" vector-effect="non-scaling-stroke"/>${t.shape === 'bar' ? `<rect width="${W}" height="3" fill="${p.accent}"/>` : ''}</svg>
     <svg viewBox="0 0 ${W} ${H}" style="margin-top:-34px">${sw}</svg>
     <b style="font-family:'${t.display}';font-size:${R(20 * CATALOG.fonts[t.display][1])}px">${esc(t.name)}</b><small>${esc(t.tagline)}</small>
@@ -774,7 +774,7 @@ $('#settings').addEventListener('click', e => {
   if (t.closest('#stClose')) return closeSettings();
   if (t.closest('#stReset')) { Object.assign(Prefs, JSON.parse(JSON.stringify(PDEF))); LIGHT = false; Store.set('theme', 'dark'); stQuery = ''; return prefsChanged(); }
   const md = t.closest('[data-mode]'); if (md) { LIGHT = md.dataset.mode === 'light'; Store.set('theme', LIGHT ? 'light' : 'dark'); return prefsChanged(); }
-  const th = t.closest('[data-theme]'); if (th) { Prefs.theme = th.dataset.theme; return prefsChanged(); }
+  const th = t.closest(".st-theme[data-skin]"); if (th) { Prefs.theme = th.dataset.skin; return prefsChanged(); }
   const tg = t.closest('[data-toggle]'); if (tg) { const id = tg.dataset.toggle; Prefs.activities = Prefs.activities.includes(id) ? Prefs.activities.filter(x => x !== id) : [...Prefs.activities, id]; return prefsChanged(); }
   const fi = t.closest('[data-first]'); if (fi) { const id = fi.dataset.first; Prefs.activities = [id, ...Prefs.activities.filter(x => x !== id)]; S.actId = id; return prefsChanged(); }
   const tp = t.closest('[data-tabpref]'); if (tp) { const id = tp.dataset.tabpref; if (id === 'ACT' && !Prefs.activities.length) return; Prefs.hiddenTabs = Prefs.hiddenTabs.includes(id) ? Prefs.hiddenTabs.filter(x => x !== id) : [...Prefs.hiddenTabs, id]; return prefsChanged(); }
