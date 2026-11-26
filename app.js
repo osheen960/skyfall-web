@@ -448,8 +448,8 @@ function scoreSummary(date, slot, g, i) {
     <div class="tiny" style="margin-top:6px">${W.golf ? 'THE SCORE IS PLAYABILITY FOR A 4-HOUR ROUND FROM THIS TEE TIME: 100 MINUS PENALTIES FOR LIGHTNING, RAIN, WIND, HEAT OR COLD AND UV. NOT A CHANCE OF RAIN.' : `THE SCORE IS HOW GOOD A ${W.hrs}-HOUR WINDOW FROM THIS START IS FOR ${W.name.toUpperCase()}: 100 MINUS PENALTIES FOR WHAT MATTERS TO IT. NOT A CHANCE OF RAIN.`}</div>`, { key: 'gscore', i });
 }
 function uplink(date, slot, g) {
-  const a = curAct();
-  if (a && a.id !== 'golf') {
+  const a0 = curAct(), a = a0 && a0.id === 'golf' && Voice.line('ACT', 'NONE') ? a0 : a0;
+  if (a && (a.id !== 'golf' || Voice.line('ACT', 'NONE'))) {
     const text = Activities.brief(a, slot, date);
     return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
   }
@@ -637,7 +637,15 @@ function applyTheme() {
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
 }
 /* The sky scene only lives behind CORE, fading as you swipe away (Android "coreness"). */
-function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; $('#scrim').style.opacity = f; }
+/* The live scene runs behind every page: the city, or the chosen activity's landscape on Activities.
+   Off CORE the scrim thickens slightly so dense panels stay readable (Android SceneCanvas scrimBoost). */
+let sceneKind = 'city';
+function updateSceneKind() {
+  const a = curAct(), k = tabKey(S.tab) === 'GOLF' && a ? (a.id === 'golf' ? 'golf' : a.group === 'any' ? 'foot' : a.group) : 'city';
+  if (k === sceneKind) return; sceneKind = k; Scene.set({ kind: k });
+  const sky = $('#sky'); sky.style.transition = 'none'; sky.style.opacity = 0.25; requestAnimationFrame(() => { sky.style.transition = 'opacity .7s'; sky.style.opacity = 1; });
+}
+function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#scrim').style.opacity = 1; document.documentElement.style.setProperty('--sb', ((1 - f) * 0.22).toFixed(3)); }
 function renderAll() { renderAlerts(); renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
 
 /* ---------- data flow ---------- */
@@ -759,7 +767,7 @@ setInterval(() => {
 /* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
 const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
 const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
-let stQuery = '';
+let stQuery = '', stTab = 0;
 function themeCard(t) {
   const p = LIGHT ? t.light : t.dark, on = t.id === Prefs.theme, W = 140, H = 34, r = Math.min(t.radius * .6, 16), c = 9;
   const d = t.shape === 'chamfer' ? `M${c} .5H${W - .5}V${H - c}L${W - c} ${H - .5}H.5V${c}Z` : ['round', 'outline', 'riveted'].includes(t.shape)
@@ -785,35 +793,37 @@ function renderSettings() {
   const el = $('#settings'), scroll = el.querySelector('.st-body')?.scrollTop || 0;
   const mine = Prefs.activities.map((id, i) => { const a = Activities.find(id); return a ? `<span class="st-mine ${i === 0 ? 'first' : ''}" data-first="${id}">${i === 0 ? '★ ' : ''}${esc(a.name)}<i data-toggle="${id}" aria-label="Remove ${esc(a.name)}">×</i></span>` : ''; }).join('');
   el.innerHTML = `<div class="st-head"><div style="flex:1"><div class="k">CUSTOMISE</div><h2>Settings</h2></div><button class="st-x" id="stClose" aria-label="Close settings">✕</button></div>
+  <nav class="st-tabs" role="tablist">${['Look', 'Activities', 'Voice', 'Alerts', 'Layout'].map((l, i) => `<button role="tab" data-sttab="${i}" aria-selected="${i === stTab}">${l}</button>`).join('')}</nav>
   <div class="st-body">
-    <section class="st-card"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
+    <section class="st-card" data-st="0"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
       <div class="st-seg"><button data-mode="dark" aria-pressed="${!LIGHT}">Dark</button><button data-mode="light" aria-pressed="${LIGHT}">Light</button></div>
       <div class="st-themes">${CATALOG.themes.map(themeCard).join('')}</div></section>
-    <section class="st-card"><h3>Activities</h3><div class="sub">Scored windows for what you actually do. The first one is shown first.</div>
+    <section class="st-card" data-st="1"><h3>Activities</h3><div class="sub">Scored windows for what you actually do. The first one is shown first.</div>
       <div class="st-lbl">YOURS</div>${Prefs.activities.length ? `<div class="st-chips">${mine}</div>` : '<div class="sub">None yet. The activities page is hidden until you add one.</div>'}
       ${Prefs.activities.length > 1 ? '<div class="sub" style="font-size:11px;margin-top:6px">Tap one to make it first.</div>' : ''}
       <div class="st-lbl" style="margin-top:14px">POPULAR</div><div class="st-chips">${CATALOG.activities.filter(a => a.popular).map(a => `<button class="st-chip" data-toggle="${a.id}" aria-pressed="${Prefs.activities.includes(a.id)}">${Prefs.activities.includes(a.id) ? '✓ ' : ''}${esc(a.name)}</button>`).join('')}</div>
       <input class="st-search" id="stSearch" type="search" autocomplete="off" placeholder="Search ${CATALOG.activities.length} activities: sailing, skiing, stargazing…" value="${esc(stQuery)}">
       <div id="stRes">${stResults()}</div></section>
-    <section class="st-card"><h3>Personality</h3><div class="sub">Who narrates your weather: comms bulletin, activity briefings and the daily briefing.</div>
-      ${CATALOG.personalities.map(p => { const h = (p.lines.BRIEF && p.lines.BRIEF.HELLO && p.lines.BRIEF.HELLO[0] || '').replaceAll('{city}', 'Melbourne').replaceAll('{date}', '1');
+    <section class="st-card" data-st="2"><h3>Personality</h3><div class="sub">Who narrates your weather: comms bulletin, activity briefings and the daily briefing.</div>
+      ${CATALOG.personalities.map(p => { const h = (p.lines.BRIEF && p.lines.BRIEF.HELLO_MORNING && p.lines.BRIEF.HELLO_MORNING[0] || '').replaceAll('{city}', 'Melbourne').replaceAll('{date}', '1');
         return `<button class="st-persona" data-persona="${p.id}" aria-pressed="${p.id === Prefs.persona}"><b>${p.id === Prefs.persona ? '✓ ' : ''}${esc(p.name)}</b><span>${esc(p.tagline)}</span>${h ? `<em>“${esc(h)}”</em>` : ''}</button>`; }).join('')}</section>
-    <section class="st-card"><h3>Alerts &amp; daily briefing</h3><div class="sub">Severe weather alerts pop up and bleep as soon as they appear; the briefing shows at your chosen time. On the web these need the page open (or installed) and notification permission.</div>
+    <section class="st-card" data-st="3"><h3>Alerts &amp; daily briefing</h3><div class="sub">Severe weather alerts pop up and bleep as soon as they appear; the briefing shows at your chosen time. On the web these need the page open (or installed) and notification permission.</div>
       ${row('fx', 'alertsOn', 'Severe weather alerts', 'Thunderstorms, damaging winds, extreme heat, flooding rain, frost, extreme UV, thunderstorm asthma', Prefs.alertsOn)}
       <div class="st-lbl">TEST THE TONES</div>
       <div class="st-tones">${['Advisory', 'Warning', 'Emergency'].map((n, i) => `<button data-tone="${i}" style="border-color:${ALC[i]};color:${ALC[i]}">${n}</button>`).join('')}</div>
       ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
       <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
       <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
-    <section class="st-card"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
+    <section class="st-card" data-st="4"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
       ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
-    <section class="st-card"><h3>Core screen</h3><div class="sub">What sits under the main gauge.</div>
+    <section class="st-card" data-st="4"><h3>Core screen</h3><div class="sub">What sits under the main gauge.</div>
       ${CORE_LABELS.map(([id, l]) => row('corepref', id, l, '', !Prefs.hiddenCore.includes(id))).join('')}</section>
-    <section class="st-card"><h3>Effects</h3>
+    <section class="st-card" data-st="4"><h3>Effects</h3>
       ${row('fx', 'liveSky', 'Live sky behind CORE', 'The animated weather scene', Prefs.liveSky)}${row('fx', 'boot', 'Boot sequence', 'Terminal intro when the app opens', Prefs.boot)}</section>
     <button class="st-reset" id="stReset">Reset to defaults</button>
     <div class="st-foot">SAVED ON THIS DEVICE. WEATHER DATA IS ALWAYS OPEN-METEO.</div>
   </div>`;
+  el.querySelectorAll('.st-card').forEach(sec => { sec.hidden = +sec.dataset.st !== stTab; });
   el.querySelector('.st-body').scrollTop = scroll;
 }
 function openSettings() { $('#settings').hidden = false; renderSettings(); }
@@ -825,6 +835,7 @@ function prefsChanged() {
 $('#settings').addEventListener('click', e => {
   const t = e.target;
   if (t.closest('#stClose')) return closeSettings();
+  const tb = t.closest('[data-sttab]'); if (tb) { stTab = +tb.dataset.sttab; renderSettings(); $('#settings .st-body').scrollTop = 0; return; }
   if (t.closest('#stReset')) { Object.assign(Prefs, JSON.parse(JSON.stringify(PDEF))); LIGHT = false; Store.set('theme', 'dark'); stQuery = ''; return prefsChanged(); }
   const md = t.closest('[data-mode]'); if (md) { LIGHT = md.dataset.mode === 'light'; Store.set('theme', LIGHT ? 'light' : 'dark'); return prefsChanged(); }
   const th = t.closest(".st-theme[data-skin]"); if (th) { Prefs.theme = th.dataset.skin; return prefsChanged(); }
@@ -847,9 +858,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#s
 
 const pager = $('#pager');
 const pageW = () => pager.querySelector('.page').offsetWidth || pager.clientWidth;
-function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; renderTop(); pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); if (tabKey(i) === 'SCAN') Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
+function goTab(i, smooth = true) { i = Math.max(0, Math.min(TABS.length - visiblePages(), i)); S.tab = i; renderTop(); pager.scrollTo({ left: i * pageW(), behavior: smooth && !reduce ? 'smooth' : 'auto' }); renderDock(); updateSceneKind(); if (tabKey(i) === 'SCAN') Scope.replay(); try { history.replaceState(null, '', '#' + TABS[i][0].toLowerCase()); } catch { } }
 $('#dock').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) goTab(+b.dataset.tab); });
-let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderTop(); renderDock(); if (i === 0) Core.replay(); if (tabKey(i) === 'SCAN') Scope.replay(); } }, 80); }, { passive: true });
+let scrollT; pager.addEventListener('scroll', () => { coreness(); clearTimeout(scrollT); scrollT = setTimeout(() => { const i = Math.round(pager.scrollLeft / pageW()); if (i !== S.tab) { S.tab = i; renderTop(); renderDock(); updateSceneKind(); if (i === 0) Core.replay(); if (tabKey(i) === 'SCAN') Scope.replay(); } }, 80); }, { passive: true });
 addEventListener('resize', () => { goTab(S.tab, false); coreness(); });
 document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goTab(Math.min(TABS.length - 1, S.tab + 1)); if (e.key === 'ArrowLeft') goTab(Math.max(0, S.tab - 1)); });
 
@@ -858,7 +869,7 @@ document.body.addEventListener('click', e => {
   const day = t.closest('[data-day]');
   if (day) { const which = day.closest('[data-chips]').dataset.chips; if (which === 'core') { S.coreDay = day.dataset.day; renderCore(); } else { S.golfDay = day.dataset.day; S.golfSlot = null; renderGolf(); } return; }
   const go = t.closest('[data-go]'); if (go) { const k = go.dataset.go; if (k === 'GOLF') S.actId = Prefs.activities[0]; const gi = TABS.findIndex(x => x[1] === k); if (gi >= 0) { if (k === 'GOLF') { renderGolf(); renderDock(); } goTab(gi); } return; }
-  const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; renderGolf(); renderDock(); renderTop(); return; }
+  const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; renderGolf(); renderDock(); renderTop(); updateSceneKind(); return; }
   const tee = t.closest('[data-tee]'); if (tee) { S.golfSlot = +tee.dataset.tee; renderGolf(); return; }
   const gt = t.closest('[data-gtab]'); if (gt) { S.golfTab = gt.dataset.gtab; renderGolf(); return; }
   const hd = t.closest('[data-hand]'); if (hd) { S.hand = hd.dataset.hand; Store.set('hand', S.hand); renderGolf(); return; }

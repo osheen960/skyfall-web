@@ -371,7 +371,7 @@ const Caddie = {
       `${s}/100. Decent. Not good enough to explain your score, though.`,
       `${s}/100 and ${lo}–${hi}°. Mild weather, wild golf.`];
     else primary = [
-      `${s}/100. Somewhere a greenkeeper is laughing, and he's not wrong.`,
+      `${s}/100. Somewhere a greenkeeper is laughing. Fair enough.`,
       `${s}/100. You'd have more fun doing your tax.`,
       `${s}/100. Technically playable. Spiritually questionable.`,
       `${s}/100. Go if you must. Nobody will stop you. Many will question you.`];
@@ -478,6 +478,9 @@ const Advisor = {
     if (feelMin <= 7) A('GLOVES', 'Gloves', `Feels ${R(feelMin)}° in daylight`, 5, L(`Feels ${R(feelMin)}°. Your hands have filed a complaint.`, `Fingers are non-refundable at ${R(feelMin)}°.`, gust >= 30 ? `${R(gust)} km/h wind on your knuckles. Gloves.` : 'Cold hands, colder coffee. Gloves.'));
     const aqi = aqiFor(w, air);
     if (aqi != null && aqi > 100) A('MASK', 'P2 mask', `AQI ${aqi}`, 8, [`AQI ${aqi}. The air has texture today. Gross.`, `AQI ${aqi}: breathing, now with extra chunks.`]);
+    // Personality: one voiced line per item (Android Advisor.loadout does the same).
+    const vars = { tmax: R(tMax), tmin: R(tMin), pop, time: wetT, mm: f1(mm), uv: R(uv), uvEnd, gust: R(gust), feel: R(feelMin) };
+    out.forEach(a => { const l = Voice.line('LOADOUT', a.gear); if (l) a.quips = [Voice.fill(l, vars)]; });
     return { date, next, items: out.sort((a, b) => b.pri - a.pri) };
   },
 
@@ -525,7 +528,7 @@ const Advisor = {
     if (act && act.id === 'golf') {
       const gw = golfW || w, sat = Golf.day(gw, Golf.defaultDay(gw));
       const pv = Voice.persona(), gd = Activities.find('golf');
-      if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + (pv && !Voice.isDefault() && gd ? Activities.brief(gd, sat.best, sat.date).split(' · ').slice(1).join(' · ') : Caddie.banter(sat)), sat.best.storm);
+      if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + (Voice.line('ACT', 'NONE') && gd ? Activities.brief(gd, sat.best, sat.date).split(' · ').slice(1).join(' · ') : Caddie.banter(sat)), sat.best.storm);
     } else if (act) {
       const date = dkey(w.current.time), b = Activities.day(w, date, act).best;
       if (b) P(act.tag, `${act.name} today · ${b.score}/100. ` + Activities.brief(act, b, date), b.storm);
@@ -533,7 +536,7 @@ const Advisor = {
     P('SYS', 'Telemetry: Open-Meteo best-match blend. ATMOS-7 out.');
     // Personality: re-voice everything except hazards and activity lines (Android Advisor.bulletin does the same).
     const pv = Voice.persona();
-    if (pv && !Voice.isDefault()) {
+    if (pv) {
       const vars = { temp, city, pop: popMax, time: wet ? hm(wet.time) : '', uv: R(uvMax), gust: R(gust), tmin: R(tMin), tmax: R(tMax), swing: R(swing), aqi: aqi ?? '', pollen: pl ? Air.upi(Air.peak(pl)).toLowerCase() : '' };
       const key = tag => ({ SITREP: sky === 'CLEAR' ? (c.isDay ? 'CLEAR_DAY' : 'CLEAR_NIGHT') : sky, PRECIP: wet ? 'WET' : 'DRY', THERMAL: swing >= 9 ? 'SWING' : 'COLD', UV: uvMax >= 8 ? 'HIGH' : 'MOD', WIND: gust >= 50 ? 'GUST' : 'CALM', AIR: (aqi || 0) <= 50 ? 'GOOD' : 'BAD' })[tag] ?? null;
       return out.map(t => { if (!['SITREP', 'PRECIP', 'THERMAL', 'UV', 'WIND', 'BIO', 'AIR', 'SYS'].includes(t.tag)) return t; const l = Voice.line(t.tag, key(t.tag), seed); return l ? { ...t, text: Voice.fill(l, vars) } : t; });
@@ -635,7 +638,7 @@ const Activities = {
   brief(a, t, date) {
     if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing and neither should you.`;
     const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, Q = CATALOG.quips;
-    const pl = !Voice.isDefault() ? Voice.line('ACT', t.limiter, 0) : null;
+    const pl = Voice.line('ACT', t.limiter, 0);
     const o = pl ? [pl] : (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
     const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) + new Date(t.tee).getUTCHours(), o.length)]
       .replaceAll('{N}', a.name).replaceAll('{n}', a.name.toLowerCase()).replaceAll('{pop}', t.pop).replaceAll('{mm}', f1(t.mm))
@@ -670,7 +673,8 @@ const Briefing = {
     const l = (k, f) => Voice.fill(Voice.line('BRIEF', k, seed) || f, vars);
     const stormy = hours.some(h => h.code >= 95 && h.code <= 99);
     const cond = pop >= 40 || stormy ? l('WET', 'Rain {pop}% from {time}.') : tmax >= 30 ? l('HOT', 'Peak {tmax}°.') : tmin <= 6 ? l('COLD', 'Low of {tmin}°.') : l('NICE', 'Pleasant day.');
-    const body = `${l('HELLO', 'Good morning.')} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
+    const hr = new Date(localNow(w.off)).getUTCHours(), period = hr >= 5 && hr <= 11 ? 'MORNING' : hr <= 16 && hr >= 12 ? 'AFTERNOON' : hr >= 17 && hr <= 20 ? 'EVENING' : 'NIGHT';
+    const body = `${l('HELLO_' + period, 'Hello.')} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
     return { title: `${p.name} // Daily briefing`, body };
   },
 };

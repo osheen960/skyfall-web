@@ -166,9 +166,10 @@ const Scene = (() => {
     // 7. Skyline, 8. ground effects, 9. glass
     // Futuristic city + street (city.js, port of Android NeonCity).
     const rgb = a => [a[1], a[2], a[3]];
-    NeonCity.draw(c, { W, H, ground, t: tm, dt: reduce ? 0 : dt, dark, skyTop: rgb(mix.top), skyMid: rgb(mix.mid), skyBot: rgb(mix.bot),
+    const env = { W, H, ground, t: tm, dt: reduce ? 0 : dt, dark, skyTop: rgb(mix.top), skyMid: rgb(mix.mid), skyBot: rgb(mix.bot),
       rain: lvRain, fog: lvFog, storm: lvStorm, snow: lvSnow, overcast: lvOver, windKmh: inp.wind, windX, snowDepth,
-      tempC: inp.tempC ?? NaN, label: inp.label || '', minute: inp.minute }, dpr);
+      tempC: inp.tempC ?? NaN, label: inp.label || '', minute: inp.minute };
+    if ((inp.kind || 'city') === 'city') NeonCity.draw(c, env, dpr); else Landscape.draw(c, inp.kind, env);
     if (lvRain > 0.05 && !reduce) drawRipples(ground, dt, dark);
     snowDepth = lvSnow > 0.05 ? Math.min(H * 0.07 * lvSnow, snowDepth + dt * H * 0.0009 * lvSnow) : Math.max(0, snowDepth - dt * H * 0.0004);
     if (snowDepth > 0.5) drawDrift();
