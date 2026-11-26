@@ -524,12 +524,20 @@ const Advisor = {
     if (aqi != null) { if (aqi <= 50) P('AIR', `Air quality good (${aqi}). Breathe freely, while stocks last.`); else P('AIR', `AQI ${aqi}. Air currently has texture. Consider limiting outdoor exertion.`, aqi > 150); }
     if (act && act.id === 'golf') {
       const gw = golfW || w, sat = Golf.day(gw, Golf.defaultDay(gw));
-      if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + Caddie.banter(sat), sat.best.storm);
+      const pv = Voice.persona(), gd = Activities.find('golf');
+      if (sat.best) P('GOLF', `Sat ${hm(sat.best.tee)} · ${sat.best.score}/100. ` + (pv && !Voice.isDefault() && gd ? Activities.brief(gd, sat.best, sat.date).split(' · ').slice(1).join(' · ') : Caddie.banter(sat)), sat.best.storm);
     } else if (act) {
       const date = dkey(w.current.time), b = Activities.day(w, date, act).best;
       if (b) P(act.tag, `${act.name} today · ${b.score}/100. ` + Activities.brief(act, b, date), b.storm);
     }
     P('SYS', 'Telemetry: Open-Meteo best-match blend. ATMOS-7 out.');
+    // Personality: re-voice everything except hazards and activity lines (Android Advisor.bulletin does the same).
+    const pv = Voice.persona();
+    if (pv && !Voice.isDefault()) {
+      const vars = { temp, city, pop: popMax, time: wet ? hm(wet.time) : '', uv: R(uvMax), gust: R(gust), tmin: R(tMin), tmax: R(tMax), swing: R(swing), aqi: aqi ?? '', pollen: pl ? Air.upi(Air.peak(pl)).toLowerCase() : '' };
+      const key = tag => ({ SITREP: sky === 'CLEAR' ? (c.isDay ? 'CLEAR_DAY' : 'CLEAR_NIGHT') : sky, PRECIP: wet ? 'WET' : 'DRY', THERMAL: swing >= 9 ? 'SWING' : 'COLD', UV: uvMax >= 8 ? 'HIGH' : 'MOD', WIND: gust >= 50 ? 'GUST' : 'CALM', AIR: (aqi || 0) <= 50 ? 'GOOD' : 'BAD' })[tag] ?? null;
+      return out.map(t => { if (!['SITREP', 'PRECIP', 'THERMAL', 'UV', 'WIND', 'BIO', 'AIR', 'SYS'].includes(t.tag)) return t; const l = Voice.line(t.tag, key(t.tag), seed); return l ? { ...t, text: Voice.fill(l, vars) } : t; });
+    }
     return out;
   },
 };
@@ -627,11 +635,76 @@ const Activities = {
   brief(a, t, date) {
     if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing and neither should you.`;
     const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, Q = CATALOG.quips;
-    const o = (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
+    const pl = !Voice.isDefault() ? Voice.line('ACT', t.limiter, 0) : null;
+    const o = pl ? [pl] : (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
     const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) + new Date(t.tee).getUTCHours(), o.length)]
       .replaceAll('{N}', a.name).replaceAll('{n}', a.name.toLowerCase()).replaceAll('{pop}', t.pop).replaceAll('{mm}', f1(t.mm))
       .replaceAll('{wind}', R(t.wind)).replaceAll('{gust}', R(t.gust)).replaceAll('{tmax}', isNaN(t.tMax) ? '--' : R(t.tMax))
       .replaceAll('{tmin}', isNaN(t.tMin) ? '--' : R(t.tMin)).replaceAll('{uv}', R(t.uv)).replaceAll('{score}', t.score);
     return `${span} · ${line}`;
+  },
+};
+
+/* ---------- personalities (Android data/Catalog.kt Persona + Voice) ---------- */
+const Voice = {
+  id: 'deadpan',
+  persona() { return CATALOG.personalities.find(p => p.id === this.id) || CATALOG.personalities[0]; },
+  isDefault() { return this.persona().id === 'deadpan'; },
+  line(section, key, seed = 0) {
+    const sec = this.persona().lines[section]; if (sec == null) return null;
+    const v = key == null ? sec : (typeof sec === 'object' && !Array.isArray(sec) ? sec[key] : null);
+    if (typeof v === 'string') return v; if (Array.isArray(v) && v.length) return v[fmod(seed, v.length)]; return null;
+  },
+  fill(t, vars) { return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t); },
+};
+
+/* ---------- daily briefing (Android notify/Briefing.text) ---------- */
+const Briefing = {
+  text(w, city) {
+    const p = Voice.persona(), c = w.current, d = today(w), seed = Math.floor(T(dkey(c.time) + 'T00:00') / DAY);
+    const from = c.time - (c.time % HOUR), hours = w.hourly.filter(h => h.time >= from).slice(0, 16);
+    const pop = Math.max(0, ...hours.map(h => h.pop || 0)), wet = hours.find(h => (h.pop || 0) >= 40);
+    const tmax = R(d ? d.max : c.temperature), tmin = R(d ? d.min : c.temperature), uv = R((d && d.uvMax) || 0);
+    const dt = new Date(c.time), date = `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.getUTCDay()]}, ${dt.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+    const vars = { city, date, temp: R(c.temperature), tmax, tmin, pop, time: wet ? hm(wet.time) : 'later', uv };
+    const l = (k, f) => Voice.fill(Voice.line('BRIEF', k, seed) || f, vars);
+    const stormy = hours.some(h => h.code >= 95 && h.code <= 99);
+    const cond = pop >= 40 || stormy ? l('WET', 'Rain {pop}% from {time}.') : tmax >= 30 ? l('HOT', 'Peak {tmax}°.') : tmin <= 6 ? l('COLD', 'Low of {tmin}°.') : l('NICE', 'Pleasant day.');
+    const body = `${l('HELLO', 'Good morning.')} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
+    return { title: `${p.name} // Daily briefing`, body };
+  },
+};
+
+/* ---------- critical weather alerts (Android data/Alerts.model) ---------- */
+const Alerts = {
+  name: l => ['ADVISORY', 'WARNING', 'EMERGENCY'][l],
+  model(w, pollen) {
+    const now = w.current.time - (w.current.time % HOUR), hrs = w.hourly.filter(h => h.time >= now).slice(0, 24);
+    if (!hrs.length) return [];
+    const out = [], dKey = dkey(now), wt = t => dkey(t) === dKey ? `from ${hm(t)}` : `from ${DOW[dow(t)]} ${hm(t)}`;
+    const add = (type, level, title, body, at) => out.push({ id: `m:${type}:${level}:${dKey}`, level, title, body, at, source: 'SKYFALL MODEL · OPEN-METEO' });
+    const st = hrs.find(h => h.code >= 95 && h.code <= 99);
+    if (st) { const hail = hrs.some(h => h.code === 96 || h.code === 99); add('storm', 1, hail ? 'THUNDERSTORMS WITH HAIL' : 'THUNDERSTORMS', `Thunderstorms forecast ${wt(st.time)}${hail ? ' with possible hail' : ''}. Get indoors when thunder starts; avoid open ground, water and tall trees.`, st.time); }
+    const gh = hrs.reduce((a, b) => (b.gust > a.gust ? b : a)), g = R(gh.gust);
+    if (g >= 100) add('wind', 2, 'DESTRUCTIVE WINDS', `Gusts to ${g} km/h ${wt(gh.time)}. Stay indoors, away from windows; secure loose objects now.`, gh.time);
+    else if (g >= 80) add('wind', 1, 'DAMAGING WINDS', `Gusts to ${g} km/h ${wt(gh.time)}. Secure loose items; take care driving and near trees.`, gh.time);
+    else if (g >= 60) add('wind', 0, 'STRONG WINDS', `Gusts to ${g} km/h ${wt(gh.time)}.`, gh.time);
+    const hot = hrs.reduce((a, b) => (b.temperature > a.temperature ? b : a)), t = R(hot.temperature);
+    if (t >= 43) add('heat', 2, 'EXTREME HEAT', `${t}° ${wt(hot.time)}. Dangerous heat: stay cool and hydrated, check on vulnerable people and pets.`, hot.time);
+    else if (t >= 38) add('heat', 1, 'HEATWAVE CONDITIONS', `${t}° ${wt(hot.time)}. Limit exertion, drink water, keep out of the sun.`, hot.time);
+    else if (t >= 35) add('heat', 0, 'HOT', `${t}° ${wt(hot.time)}. Take care in the sun.`, hot.time);
+    const cold = hrs.reduce((a, b) => (b.temperature < a.temperature ? b : a)), tc = R(cold.temperature);
+    if (tc <= -5) add('cold', 1, 'SEVERE COLD', `${tc}° ${wt(cold.time)}. Protect pipes, pets and plants; dress for hypothermia risk.`, cold.time);
+    else if (tc <= 1) add('cold', 0, 'FROST', `${tc}° ${wt(cold.time)}. Frost and icy surfaces likely.`, cold.time);
+    const pr = hrs.reduce((a, b) => (b.precip > a.precip ? b : a)), sum = hrs.reduce((s, h) => s + h.precip, 0);
+    if (pr.precip >= 20) add('rain', 1, 'HEAVY RAIN · FLASH FLOODING', `Up to ${R(pr.precip)} mm in an hour ${wt(pr.time)}. Never drive through floodwater.`, pr.time);
+    else if (sum >= 50) add('rain', 1, 'HEAVY RAIN', `${R(sum)} mm forecast in the next 24 h. Flooding possible; never drive through floodwater.`, pr.time);
+    else if (sum >= 25) add('rain', 0, 'SOAKING RAIN', `${R(sum)} mm forecast in the next 24 h.`, pr.time);
+    const sn = hrs.find(h => h.code === 75 || h.code === 86); if (sn) add('snow', 1, 'HEAVY SNOW', `Heavy snow ${wt(sn.time)}. Roads may close; carry chains and warm gear.`, sn.time);
+    const uvh = hrs.reduce((a, b) => ((b.uv || 0) > (a.uv || 0) ? b : a)); if ((uvh.uv || 0) >= 11) add('uv', 0, 'EXTREME UV', `UV ${R(uvh.uv)} ${wt(uvh.time)}. Skin burns in minutes: cover up, SPF50+, shade.`, uvh.time);
+    const fog = hrs.find(h => (h.visibility ?? 99999) < 200); if (fog) add('fog', 0, 'DENSE FOG', `Visibility under 200 m ${wt(fog.time)}. Slow down, low beams on.`, fog.time);
+    const pd = pollen && pollen.days ? pollen.days.find(x => x.date === dKey) : null;
+    if (pd && pd.asthma) add('asthma', 2, 'THUNDERSTORM ASTHMA RISK', 'High grass pollen with storms forecast. If you have asthma or hay fever, keep reliever medication on you and stay indoors as the storm front passes.', null);
+    return out.sort((a, b) => b.level - a.level);
   },
 };

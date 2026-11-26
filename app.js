@@ -5,10 +5,11 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
-const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true };
+const PDEF = { theme: 'atmos', activities: ['golf'], hiddenTabs: [], hiddenCore: [], liveSky: true, boot: true, persona: 'deadpan', alertsOn: true, briefingOn: true, briefingAt: '07:00' };
 const Prefs = Object.assign({}, PDEF, Store.get('prefs', {}));
 Prefs.activities = (Prefs.activities || []).filter(id => Activities.find(id));
-const savePrefs = () => Store.set('prefs', Prefs);
+Voice.id = Prefs.persona;
+const savePrefs = () => { Voice.id = Prefs.persona; Store.set('prefs', Prefs); };
 const primaryAct = () => Activities.find(Prefs.activities[0] || '') || null;
 const ALL_TABS = [['CORE', 'CORE', 'p-core'], ['24H', 'SCAN', 'p-scan'], ['10D', 'TRAJ', 'p-traj'], ['DATA', 'DATA', 'p-data'], ['GOLF', 'GOLF', 'p-golf'], ['AIR', 'AIR', 'p-air']];
 const TAB_PREF = { SCAN: 'SCAN', TRAJ: 'TRAJ', DATA: 'DATA', GOLF: 'ACT', AIR: 'AIR' };
@@ -208,6 +209,7 @@ function renderCore() {
   const tag = isToday ? '' : `${DOW[dow(d.ms)]} ${ddmm(d.date)} · MIDDAY`;
   const cm = comms(w);
   $('#p-core').innerHTML = `<div class="col">
+    ${isToday ? briefCard() : ''}
     ${dayChips(S.w, dkey(c.time))}
     <div class="core" id="core" role="img" aria-label="${R(c.temperature)} degrees, ${esc(Codes.label(c.code))}">
       <canvas></canvas>
@@ -636,7 +638,7 @@ function applyTheme() {
 }
 /* The sky scene only lives behind CORE, fading as you swipe away (Android "coreness"). */
 function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#sky').style.opacity = f; $('#scrim').style.opacity = f; }
-function renderAll() { renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
+function renderAll() { renderAlerts(); renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
 
 /* ---------- data flow ---------- */
 function loadFromCache() {
@@ -713,6 +715,47 @@ addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').hid
 $('#btnInstall').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch { } installEvt = null; $('#btnInstall').hidden = true; });
 $('#searchClose').addEventListener('click', () => { if (S.place) closeSearch(); });
 
+
+/* ---------- alerts + daily briefing (Android ui/AlertBanner.kt, notify/*) ---------- */
+const ALC = ['#FFB547', '#FF7A3D', '#FF3B30'];
+const played = new Set(), notified = new Set(Store.get('alertsSeen', []));
+let alOpen = false;
+function playTone(level) { try { const a = new Audio(`sounds/alert_${['advisory', 'warning', 'emergency'][level]}.wav`); a.play().catch(() => { }); } catch { } }
+async function pushNote(title, body, tag) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) reg.showNotification(title, { body, tag, icon: 'icon-192.png', badge: 'icon-192.png' }); else new Notification(title, { body, tag });
+  } catch { }
+}
+function askNotify() { try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch { } }
+function renderAlerts() {
+  const el = $('#alerts'), w = S.w;
+  const list = Prefs.alertsOn && w ? Alerts.model(w, S.pollenKey && S.pollen ? S.pollen : Air.estimate(w)) : [];
+  if (!list.length) { el.hidden = true; document.documentElement.style.setProperty('--alerth', '0px'); return; }
+  const top = list[0];
+  el.innerHTML = `<div class="al l${top.level}" style="--alc:${ALC[top.level]}"><div class="h"><i>⚠</i><span style="flex:1">${Alerts.name(top.level)} // ${esc(top.title)}</span><span>${alOpen ? '▾' : list.length > 1 ? `+${list.length - 1} ›` : '›'}</span></div>
+    ${alOpen ? list.map(a => `<div class="row"><div class="h" style="--alc:${ALC[a.level]};color:${ALC[a.level]}">${Alerts.name(a.level)} · ${esc(a.title)}</div><div class="b">${esc(a.body)}</div><div class="src">${esc(a.source)}</div></div>`).join('') + '<div class="src" style="margin-top:6px">TAP TO COLLAPSE · ALWAYS FOLLOW OFFICIAL EMERGENCY ADVICE</div>' : `<div class="b">${esc(top.body)}</div>`}</div>`;
+  el.hidden = false;
+  requestAnimationFrame(() => document.documentElement.style.setProperty('--alerth', (el.offsetHeight + 6) + 'px'));
+  if (!played.has(top.id)) { played.add(top.id); playTone(top.level); }
+  list.filter(a => !notified.has(a.id)).forEach(a => { notified.add(a.id); pushNote(`${Alerts.name(a.level)} · ${a.title}`, a.body, a.id); });
+  Store.set('alertsSeen', [...notified].slice(-60));
+}
+$('#alerts').addEventListener('click', () => { alOpen = !alOpen; renderAlerts(); });
+const todayKey = () => S.w ? dkey(S.w.current.time) : '';
+const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = new Date(localNow(S.w.off)), [h, m] = Prefs.briefingAt.split(':').map(Number); return n.getUTCHours() * 60 + n.getUTCMinutes() >= h * 60 + m; };
+function briefCard(force = false) {
+  if (!S.w || (!force && (!briefDue() || Store.get('briefDismissed', '') === todayKey()))) return '';
+  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
+  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span><button id="briefX" aria-label="Dismiss briefing">✕</button></div>${esc(b.body)}</div>`;
+}
+document.addEventListener('click', e => { if (e.target.closest('#briefX')) { Store.set('briefDismissed', todayKey()); $('#briefCard')?.remove(); } });
+setInterval(() => {
+  if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;
+  Store.set('briefPushed', todayKey());
+  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector'); pushNote(b.title, b.body, 'briefing'); renderCore();
+}, 30000);
 /* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
 const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
 const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
@@ -752,6 +795,16 @@ function renderSettings() {
       <div class="st-lbl" style="margin-top:14px">POPULAR</div><div class="st-chips">${CATALOG.activities.filter(a => a.popular).map(a => `<button class="st-chip" data-toggle="${a.id}" aria-pressed="${Prefs.activities.includes(a.id)}">${Prefs.activities.includes(a.id) ? '✓ ' : ''}${esc(a.name)}</button>`).join('')}</div>
       <input class="st-search" id="stSearch" type="search" autocomplete="off" placeholder="Search ${CATALOG.activities.length} activities: sailing, skiing, stargazing…" value="${esc(stQuery)}">
       <div id="stRes">${stResults()}</div></section>
+    <section class="st-card"><h3>Personality</h3><div class="sub">Who narrates your weather: comms bulletin, activity briefings and the daily briefing.</div>
+      ${CATALOG.personalities.map(p => { const h = (p.lines.BRIEF && p.lines.BRIEF.HELLO && p.lines.BRIEF.HELLO[0] || '').replaceAll('{city}', 'Melbourne').replaceAll('{date}', '1');
+        return `<button class="st-persona" data-persona="${p.id}" aria-pressed="${p.id === Prefs.persona}"><b>${p.id === Prefs.persona ? '✓ ' : ''}${esc(p.name)}</b><span>${esc(p.tagline)}</span>${h ? `<em>“${esc(h)}”</em>` : ''}</button>`; }).join('')}</section>
+    <section class="st-card"><h3>Alerts &amp; daily briefing</h3><div class="sub">Severe weather alerts pop up and bleep as soon as they appear; the briefing shows at your chosen time. On the web these need the page open (or installed) and notification permission.</div>
+      ${row('fx', 'alertsOn', 'Severe weather alerts', 'Thunderstorms, damaging winds, extreme heat, flooding rain, frost, extreme UV, thunderstorm asthma', Prefs.alertsOn)}
+      <div class="st-lbl">TEST THE TONES</div>
+      <div class="st-tones">${['Advisory', 'Warning', 'Emergency'].map((n, i) => `<button data-tone="${i}" style="border-color:${ALC[i]};color:${ALC[i]}">${n}</button>`).join('')}</div>
+      ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
+      <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
+      <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
     <section class="st-card"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
       ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
     <section class="st-card"><h3>Core screen</h3><div class="sub">What sits under the main gauge.</div>
@@ -779,8 +832,12 @@ $('#settings').addEventListener('click', e => {
   const fi = t.closest('[data-first]'); if (fi) { const id = fi.dataset.first; Prefs.activities = [id, ...Prefs.activities.filter(x => x !== id)]; S.actId = id; return prefsChanged(); }
   const tp = t.closest('[data-tabpref]'); if (tp) { const id = tp.dataset.tabpref; if (id === 'ACT' && !Prefs.activities.length) return; Prefs.hiddenTabs = Prefs.hiddenTabs.includes(id) ? Prefs.hiddenTabs.filter(x => x !== id) : [...Prefs.hiddenTabs, id]; return prefsChanged(); }
   const cp = t.closest('[data-corepref]'); if (cp) { const id = cp.dataset.corepref; Prefs.hiddenCore = Prefs.hiddenCore.includes(id) ? Prefs.hiddenCore.filter(x => x !== id) : [...Prefs.hiddenCore, id]; return prefsChanged(); }
-  const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; return prefsChanged(); }
+  const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; if ((fx.dataset.fx === 'alertsOn' || fx.dataset.fx === 'briefingOn') && Prefs[fx.dataset.fx]) askNotify(); return prefsChanged(); }
+  const ps = t.closest('[data-persona]'); if (ps) { Prefs.persona = ps.dataset.persona; typedSig.comms = ''; return prefsChanged(); }
+  const tn = t.closest('[data-tone]'); if (tn) { const l = +tn.dataset.tone; playTone(l); askNotify(); pushNote(`${Alerts.name(l)} · TEST`, `This is a test of the Skyfall ${Alerts.name(l).toLowerCase()} alert.`, 'test' + l); return; }
+  if (t.closest('#stBriefNow')) { Store.set('briefDismissed', ''); closeSettings(); goTab(0); renderCore(); const b = S.w && Briefing.text(S.w, S.place ? S.place.name : 'your sector'); if (b) pushNote(b.title, b.body, 'briefing'); return; }
 });
+$('#settings').addEventListener('change', e => { if (e.target.id === 'stBriefAt' && e.target.value) { Prefs.briefingAt = e.target.value; Store.set('briefPushed', ''); savePrefs(); renderCore(); } });
 $('#settings').addEventListener('input', e => { if (e.target.id === 'stSearch') { stQuery = e.target.value; $('#stRes').innerHTML = stResults(); } });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#settings').hidden) closeSettings(); });
 $('#btnSettings').addEventListener('click', openSettings);
