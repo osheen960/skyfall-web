@@ -554,18 +554,14 @@ function M(hex) {
 }
 function themeAccent(minute, rise, set, tempC, sky) {
   if (THEME && !THEME.dynamic) return (LIGHT ? THEME.light : THEME.dark).accent.toLowerCase();
-  const keys = [[rise - 60, '#5b8cff'], [rise - 10, '#ffb067'], [rise + 50, '#00e5ff'], [set - 100, '#00e5ff'], [set - 20, '#ffb547'], [set + 20, '#ff8a3d'], [set + 75, '#5b8cff']];
-  let tod = '#5b8cff';
+  // Atmos: deep electric blue that drifts with the time of day (no temperature tint; Android Hud.kt themeAccent).
+  const keys = [[rise - 60, '#5b7cff'], [rise - 10, '#6fa0ff'], [rise + 50, '#3d9bff'], [set - 100, '#3d9bff'], [set - 20, '#5aa8ff'], [set + 20, '#4f7dff'], [set + 75, '#5b7cff']];
+  let tod = '#5b7cff';
   if (minute > keys[0][0] && minute < keys[keys.length - 1][0]) for (let k = 0; k < keys.length - 1; k++) { const [m0, c0] = keys[k], [m1, c1] = keys[k + 1]; if (minute >= m0 && minute <= m1) { tod = lerpHex(c0, c1, m1 > m0 ? (minute - m0) / (m1 - m0) : 0); break; } }
-  const ts = [[2, '#7fd4ff'], [12, '#00f0d0'], [19, '#9dff5c'], [25, '#ffc23d'], [31, '#ff6a3d'], [38, '#ff3b30']];
-  const t = isNaN(tempC) ? 18 : tempC;
-  let tc; if (t <= ts[0][0]) tc = ts[0][1]; else if (t >= ts[5][0]) tc = ts[5][1]; else { const i = ts.findIndex(x => x[0] > t); tc = lerpHex(ts[i - 1][1], ts[i][1], (t - ts[i - 1][0]) / (ts[i][0] - ts[i - 1][0])); }
   const mix = (a, b, f) => { let d = b - a; if (d > 180) d -= 360; if (d < -180) d += 360; return fmod(a + d * f, 360); };
-  const a = rgbToHsv(hexToRgb(tod)), b = rgbToHsv(hexToRgb(tc));
-  let h = mix(a[0], b[0], 0.38); if (sky === 'STORM') h = mix(h, 215, 0.35);
-  // No pinks or purples: hue blends that land in the magenta band snap to blue or orange.
-  if (h > 255 && h < 345) h = h < 300 ? 225 : 20;
-  return M(hsvToHex(h, Math.max(a[1], b[1]) * 0.85, 1));
+  const a = rgbToHsv(hexToRgb(tod));
+  let h = a[0]; if (sky === 'STORM') h = mix(h, 215, 0.35);
+  return M(hsvToHex(h, a[1], 1));
 }
 function tempColor(t) {
   const st = [[-5, '#5b7bff'], [5, '#00b3ff'], [13, '#00f0d0'], [20, '#b6ff3d'], [26, '#ffd23d'], [32, '#ff7a3d'], [40, '#ff3b30']];
@@ -629,20 +625,13 @@ const Activities = {
       limiter: worst && worst.points >= 6 ? worst.label : 'NONE', deductions };
   },
   brief(a, t, date) {
-    if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing.`;
-    const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, n = a.name;
-    const o = {
-      LIGHTNING: ['Storm cells in the window. Postpone. Lightning does not negotiate.', `Thunderstorms forecast. ${n} can wait; you'd prefer to.`],
-      RAIN: [`Rain ${t.pop}% in the window. ${n} becomes an endurance event.`, `${t.pop}% chance of rain, ${f1(t.mm)} mm. Pack something waterproof and low expectations.`],
-      WIND: [`Wind ${R(t.wind)} km/h, gusts ${R(t.gust)}. ${n} will be aerodynamic.`, `Gusts to ${R(t.gust)} km/h. Hold onto anything you like.`],
-      CALM: [`Only ${R(t.wind)} km/h of breeze. Not enough to bother rigging.`, `Dead calm at ${R(t.wind)} km/h. Bring patience, or a fan.`],
-      HEAT: [`Peak ${R(t.tMax)}°. Hydrate like it's your job.`, `${R(t.tMax)}° at the top end. Shade breaks are not optional.`],
-      COLD: [`Low ${R(t.tMin)}°. Layers, then more layers.`, `${R(t.tMin)}° at the cold end. Warm up properly or regret it.`],
-      UV: [`UV ${R(t.uv)}. SPF50+ and a hat or shade.`, `UV ${R(t.uv)}: the sun is working overtime.`],
-      CLOUD: ['Cloud cover is the main problem. The sky is closed for viewing.', 'Too much cloud. Patience, or a different night.'],
-      VISIBILITY: ["Visibility is poor. You'll mostly see the inside of the haze.", 'Low visibility. Keep it close and keep it safe.'],
-    }[t.limiter] || [`As good as it gets. Score ${t.score}. No excuses.`, `Clean window. Score ${t.score}. Go.`];
-    const hour = new Date(t.tee).getUTCHours();
-    return `${span} · ${o[fmod(Math.floor(T(date + 'T00:00') / DAY) + hour, o.length)]}`;
+    if (!t) return `No usable window for ${a.name.toLowerCase()} on this day. The forecast regrets nothing and neither should you.`;
+    const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, Q = CATALOG.quips;
+    const o = (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
+    const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) + new Date(t.tee).getUTCHours(), o.length)]
+      .replaceAll('{N}', a.name).replaceAll('{n}', a.name.toLowerCase()).replaceAll('{pop}', t.pop).replaceAll('{mm}', f1(t.mm))
+      .replaceAll('{wind}', R(t.wind)).replaceAll('{gust}', R(t.gust)).replaceAll('{tmax}', isNaN(t.tMax) ? '--' : R(t.tMax))
+      .replaceAll('{tmin}', isNaN(t.tMin) ? '--' : R(t.tMin)).replaceAll('{uv}', R(t.uv)).replaceAll('{score}', t.score);
+    return `${span} · ${line}`;
   },
 };

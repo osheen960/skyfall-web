@@ -5,7 +5,7 @@ PICTURE: the living sky behind CORE; the reactor core gauge.
 COLOUR and TYPE: void black, ice ink, one accent drifting with time of day and temperature; Rajdhani + Share Tech Mono.
 LAYOUT: Android metrics 1:1 (1dp = 1px) - 14px page gutters, 12px between panels, 54px dock.
 */
-:root{--fd:'rajdhani';--fl:'sharetech';--ds:1;--ls:1;--rad:0px;--shade:0,0,0;--voidrgb:2,4,9;--inkrgb:230,251,255;--void:#020409;--ink:#e6fbff;--dim:rgba(var(--inkrgb),.58);--faint:rgba(var(--inkrgb),.32);--ac:#00e5ff;--amber:#ffb547;--alert:#ff4d6a;--good:#3dff9a;color-scheme:dark}
+:root{--fd:'rajdhani';--fl:'sharetech';--ds:1;--ls:1;--rad:0px;--shade:0,0,0;--voidrgb:2,4,9;--inkrgb:230,251,255;--void:#040a1c;--ink:#e6f0ff;--dim:rgba(var(--inkrgb),.58);--faint:rgba(var(--inkrgb),.32);--ac:#00e5ff;--amber:#ffb547;--alert:#ff4d6a;--good:#3dff9a;color-scheme:dark}
 @font-face{font-family:'sharetech';src:url(fonts/sharetech_mono.ttf) format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'cinzel';src:url(fonts/f_cinzel.ttf) format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'imfell';src:url(fonts/f_imfell.ttf) format('truetype');font-weight:100 900;font-display:swap}
@@ -36,7 +36,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-off
 
 /* ---- light mode (matches Android Mode.light) ---- */
 body.light{color-scheme:light}
-body.light #scrim{background:linear-gradient(rgba(var(--voidrgb),.72),rgba(var(--voidrgb),.55),rgba(var(--voidrgb),.85))}
+body.light #scrim{background:linear-gradient(rgba(var(--voidrgb),.55),rgba(var(--voidrgb),.35),rgba(var(--voidrgb),.7))}
 body.light #boot{background:rgba(var(--voidrgb),.96)}
 body.light #toast{background:color-mix(in srgb,var(--alert) 10%,#eef3f7)}
 
@@ -51,9 +51,9 @@ body.light #btnMode svg{transform:rotate(180deg)}
 /* ---- backdrop ---- */
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;transition:opacity .35s}
 #grid{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(transparent 0 calc(100% - 1px),color-mix(in srgb,var(--ac) 6%,transparent) 0) 0 0/100% 34px,linear-gradient(90deg,transparent 0 calc(100% - 1px),color-mix(in srgb,var(--ac) 4%,transparent) 0) 0 0/34px 100%}
-#scrim{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(rgba(var(--voidrgb),.55),rgba(var(--voidrgb),.3),rgba(var(--voidrgb),.72))}
+#scrim{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(rgba(var(--voidrgb),.4),rgba(var(--voidrgb),.12),rgba(var(--voidrgb),.55))}
 body.amb #scrim{opacity:0!important}
-body:not([data-theme=atmos]):not(.light) #scrim{background:linear-gradient(rgba(var(--voidrgb),.7),rgba(var(--voidrgb),.5),rgba(var(--voidrgb),.82))}
+
 
 #boot{position:fixed;inset:0;z-index:50;background:rgba(var(--voidrgb),.96);display:flex;align-items:center;padding:0 32px;transition:opacity .6s}
 #boot.gone{opacity:0;pointer-events:none}
