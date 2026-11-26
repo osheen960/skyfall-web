@@ -170,6 +170,7 @@ const Scene = (() => {
       rain: lvRain, fog: lvFog, storm: lvStorm, snow: lvSnow, overcast: lvOver, windKmh: inp.wind, windX, snowDepth,
       tempC: inp.tempC ?? NaN, label: inp.label || '', minute: inp.minute };
     if ((inp.kind || 'city') === 'city') NeonCity.draw(c, env, dpr); else Landscape.draw(c, inp.kind, env);
+    if (inp.fx && inp.fx.length) Festive.draw(c, inp.fx, inp.fxDay || 0, env);
     if (lvRain > 0.05 && !reduce) drawRipples(ground, dt, dark);
     snowDepth = lvSnow > 0.05 ? Math.min(H * 0.07 * lvSnow, snowDepth + dt * H * 0.0009 * lvSnow) : Math.max(0, snowDepth - dt * H * 0.0004);
     if (snowDepth > 0.5) drawDrift();

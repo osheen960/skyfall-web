@@ -632,6 +632,8 @@ function applyTheme() {
   const intensity = ({ 51: .25, 56: .25, 53: .35, 55: .45, 57: .45, 61: .5, 66: .5, 63: .8, 65: 1, 67: 1, 80: .6, 81: .85, 82: 1, 71: .5, 73: .75, 75: 1, 77: .4, 85: .6, 86: 1, 95: 1, 96: 1, 99: 1 })[code] || 0;
   Scene.set({ tempC: w.current.temperature, label: Codes.label(code).toUpperCase(), sky: Codes.sky(code), intensity, minute: minute + n.getUTCSeconds() / 60, rise, set, wind: hr ? hr.wind : w.current.windSpeed, windFrom: hr ? hr.dir : w.current.windDirection,
     cloudCover: w.current.cloudCover || 0, moon: moonPhase(Date.now()), southern: w.lat < 0 });
+  if (S.place) Occasions.state = Occasions.stateOf(S.place.lat, S.place.lon);
+  const occ = Occasions.today(dkey(w.current.time)); Scene.set({ fx: occ.flatMap(o => o.fx || []), fxDay: occ.length ? occ[0].day : 0 });
   $('#ambTemp').textContent = deg(w.current.temperature);
   $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + '';
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
@@ -753,12 +755,12 @@ function renderAlerts() {
 $('#alerts').addEventListener('click', () => { alOpen = !alOpen; renderAlerts(); });
 const todayKey = () => S.w ? dkey(S.w.current.time) : '';
 const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = new Date(localNow(S.w.off)), [h, m] = Prefs.briefingAt.split(':').map(Number); return n.getUTCHours() * 60 + n.getUTCMinutes() >= h * 60 + m; };
-function briefCard(force = false) {
-  if (!S.w || (!force && (!briefDue() || Store.get('briefDismissed', '') === todayKey()))) return '';
-  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
-  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span><button id="briefX" aria-label="Dismiss briefing">✕</button></div>${esc(b.body)}</div>`;
+function briefCard() {
+  if (!S.w || !Prefs.briefingOn) return '';
+  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector'), folded = Store.get('briefFolded', '') === todayKey();
+  return `<div class="brief ${folded ? 'folded' : ''}" id="briefCard" role="button" tabindex="0" aria-expanded="${!folded}"><div class="t"><span>${esc(b.title.toUpperCase())}</span><i aria-hidden="true">${folded ? '▾' : '✕'}</i></div>${folded ? '' : `<div class="b">${esc(b.body)}</div>`}</div>`;
 }
-document.addEventListener('click', e => { if (e.target.closest('#briefX')) { Store.set('briefDismissed', todayKey()); $('#briefCard')?.remove(); } });
+document.addEventListener('click', e => { if (e.target.closest('#briefCard')) { const f = Store.get('briefFolded', '') === todayKey(); Store.set('briefFolded', f ? '' : todayKey()); renderCore(); } });
 setInterval(() => {
   if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;
   Store.set('briefPushed', todayKey());
@@ -798,6 +800,11 @@ function renderSettings() {
     <section class="st-card" data-st="0"><h3>Appearance</h3><div class="sub">Dark or light, then pick a look.</div>
       <div class="st-seg"><button data-mode="dark" aria-pressed="${!LIGHT}">Dark</button><button data-mode="light" aria-pressed="${LIGHT}">Light</button></div>
       <div class="st-themes">${CATALOG.themes.map(themeCard).join('')}</div></section>
+    <section class="st-card" data-st="0"><h3>Holidays &amp; occasions</h3><div class="sub">Australian public holidays for your state, plus commemorative and cultural days, change the background and the briefing.</div>
+      <div class="st-lbl" style="color:var(--ac)">TODAY: ${esc((S.w ? Occasions.on(dkey(S.w.current.time), Occasions.state) : []).map(o => o.name.toUpperCase()).join(' · ') || 'NOTHING ON THE CALENDAR')}${Occasions.state ? '  //  ' + Occasions.state.toUpperCase() : ''}</div>
+      <div class="st-lbl" style="margin-top:12px">PREVIEW A DAY</div>
+      <div class="st-chips st-occ">${[['', 'Today'], ...Occasions.all()].map(([id, n]) => `<button class="st-chip" data-occ="${id}" aria-pressed="${Occasions.preview === id}">${esc(n)}</button>`).join('')}</div>
+      <div class="sub" style="font-size:11px;margin-top:6px">Previews last until you reload.</div></section>
     <section class="st-card" data-st="1"><h3>Activities</h3><div class="sub">Scored windows for what you actually do. The first one is shown first.</div>
       <div class="st-lbl">YOURS</div>${Prefs.activities.length ? `<div class="st-chips">${mine}</div>` : '<div class="sub">None yet. The activities page is hidden until you add one.</div>'}
       ${Prefs.activities.length > 1 ? '<div class="sub" style="font-size:11px;margin-top:6px">Tap one to make it first.</div>' : ''}
@@ -844,9 +851,10 @@ $('#settings').addEventListener('click', e => {
   const tp = t.closest('[data-tabpref]'); if (tp) { const id = tp.dataset.tabpref; if (id === 'ACT' && !Prefs.activities.length) return; Prefs.hiddenTabs = Prefs.hiddenTabs.includes(id) ? Prefs.hiddenTabs.filter(x => x !== id) : [...Prefs.hiddenTabs, id]; return prefsChanged(); }
   const cp = t.closest('[data-corepref]'); if (cp) { const id = cp.dataset.corepref; Prefs.hiddenCore = Prefs.hiddenCore.includes(id) ? Prefs.hiddenCore.filter(x => x !== id) : [...Prefs.hiddenCore, id]; return prefsChanged(); }
   const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; if ((fx.dataset.fx === 'alertsOn' || fx.dataset.fx === 'briefingOn') && Prefs[fx.dataset.fx]) askNotify(); return prefsChanged(); }
+  const oc = t.closest('[data-occ]'); if (oc) { Occasions.preview = oc.dataset.occ; return prefsChanged(); }
   const ps = t.closest('[data-persona]'); if (ps) { Prefs.persona = ps.dataset.persona; typedSig.comms = ''; return prefsChanged(); }
   const tn = t.closest('[data-tone]'); if (tn) { const l = +tn.dataset.tone; playTone(l); askNotify(); pushNote(`${Alerts.name(l)} · TEST`, `This is a test of the Skyfall ${Alerts.name(l).toLowerCase()} alert.`, 'test' + l); return; }
-  if (t.closest('#stBriefNow')) { Store.set('briefDismissed', ''); closeSettings(); goTab(0); renderCore(); const b = S.w && Briefing.text(S.w, S.place ? S.place.name : 'your sector'); if (b) pushNote(b.title, b.body, 'briefing'); return; }
+  if (t.closest('#stBriefNow')) { Store.set('briefFolded', ''); closeSettings(); goTab(0); renderCore(); const b = S.w && Briefing.text(S.w, S.place ? S.place.name : 'your sector'); if (b) pushNote(b.title, b.body, 'briefing'); return; }
 });
 $('#settings').addEventListener('change', e => { if (e.target.id === 'stBriefAt' && e.target.value) { Prefs.briefingAt = e.target.value; Store.set('briefPushed', ''); savePrefs(); renderCore(); } });
 $('#settings').addEventListener('input', e => { if (e.target.id === 'stSearch') { stQuery = e.target.value; $('#stRes').innerHTML = stResults(); } });

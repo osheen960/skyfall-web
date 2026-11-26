@@ -661,6 +661,60 @@ const Voice = {
   fill(t, vars) { return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t); },
 };
 
+
+/* ---------- Australian holidays + commemorations (Android data/Occasions.kt; rules in spec/catalog.py) ---------- */
+const Occasions = {
+  state: null, preview: '',
+  stateOf(lat, lon) {
+    const box = (a0, a1, o0, o1) => lat >= a0 && lat <= a1 && lon >= o0 && lon <= o1;
+    if (box(-35.95, -35.1, 148.75, 149.4)) return 'act';
+    if (box(-43.8, -39.4, 143.5, 148.6)) return 'tas';
+    if (box(-39.3, -33.9, 140.9, 150.1) && !(lat > -36.0 && lon > 146.5)) return 'vic';
+    if (box(-37.6, -28.1, 140.9, 153.8)) return 'nsw';
+    if (box(-29.2, -10.0, 137.9, 154.0)) return 'qld';
+    if (box(-38.2, -25.9, 129.0, 141.0)) return 'sa';
+    if (box(-26.1, -10.9, 129.0, 138.0)) return 'nt';
+    if (box(-35.3, -13.5, 112.8, 129.0)) return 'wa';
+    return null;
+  },
+  // Dates are UTC-midnight ms for whole-day arithmetic.
+  easter(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const x = h + l - 7 * m + 114; return Date.UTC(y, Math.floor(x / 31) - 1, (x % 31) + 1);
+  },
+  start(r, y) {
+    const D = 86400000, wd = ms => (new Date(ms).getUTCDay() + 6) % 7; let base = null;
+    if (r.fixed) base = Date.UTC(y, r.fixed[0] - 1, r.fixed[1]);
+    else if (r.easter != null) base = this.easter(y) + r.easter * D;
+    else if (r.nth) { const [mo, w, n] = r.nth;
+      if (n < 0) { const last = Date.UTC(y, mo, 0); base = last - ((wd(last) - w + 7) % 7) * D; }
+      else { const first = Date.UTC(y, mo - 1, 1); base = first + ((w - wd(first) + 7) % 7) * D + (n - 1) * 7 * D; } }
+    else if (r.after) { const b = Date.UTC(y, r.after[0] - 1, r.after[1]); base = b + ((r.after[2] - wd(b) + 7) % 7) * D; }
+    else if (r.table && r.table[y]) base = Date.UTC(y, r.table[y][0] - 1, r.table[y][1]);
+    return base == null ? null : base + (r.off || 0) * D;
+  },
+  on(dateKey, st) {
+    const [Y, M, Dd] = dateKey.split('-').map(Number), t = Date.UTC(Y, M - 1, Dd), out = [];
+    for (const o of CATALOG.occasions || []) {
+      if (o.states && (!st || !o.states.includes(st))) continue;
+      for (const y of [Y, Y - 1]) { const s0 = this.start(o.rule, y); if (s0 == null) continue; const k = Math.round((t - s0) / 86400000); if (k >= 0 && k < (o.span || 1)) { out.push({ ...o, day: k }); break; } }
+    }
+    if (out.length > 1) { const loud = out.filter(o => !o.quiet); return loud.length ? loud : out; }
+    return out;
+  },
+  today(dateKey) {
+    if (this.preview) { const o = (CATALOG.occasions || []).find(x => x.id === this.preview); if (o) return [{ ...o, day: 0 }]; }
+    return this.on(dateKey || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10), this.state);
+  },
+  all() { const seen = new Set(); return (CATALOG.occasions || []).filter(o => !seen.has(o.name) && seen.add(o.name)).map(o => [o.id, o.name]); },
+  line(o, seed) {
+    if (o.quiet) return null;
+    const t = Voice.line('OCC', o.cat, seed) || '{name}.', st = this.state;
+    return Voice.fill(t, { name: o.name }) + (o.ph && o.cat !== 'PUBLIC' ? ` Public holiday${st ? ` in ${st.toUpperCase()}` : ''}.` : '');
+  },
+};
+
 /* ---------- daily briefing (Android notify/Briefing.text) ---------- */
 const Briefing = {
   text(w, city) {
@@ -674,7 +728,8 @@ const Briefing = {
     const stormy = hours.some(h => h.code >= 95 && h.code <= 99);
     const cond = pop >= 40 || stormy ? l('WET', 'Rain {pop}% from {time}.') : tmax >= 30 ? l('HOT', 'Peak {tmax}°.') : tmin <= 6 ? l('COLD', 'Low of {tmin}°.') : l('NICE', 'Pleasant day.');
     const hr = new Date(localNow(w.off)).getUTCHours(), period = hr >= 5 && hr <= 11 ? 'MORNING' : hr <= 16 && hr >= 12 ? 'AFTERNOON' : hr >= 17 && hr <= 20 ? 'EVENING' : 'NIGHT';
-    const body = `${l('HELLO_' + period, 'Hello.')} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
+    const occ = Occasions.today(dkey(c.time)).map(o => Occasions.line(o, seed)).filter(Boolean).join(' ');
+    const body = `${l('HELLO_' + period, 'Hello.')}${occ ? ' ' + occ : ''} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
     return { title: `${p.name} // Daily briefing`, body };
   },
 };
