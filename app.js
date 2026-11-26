@@ -641,11 +641,11 @@ function applyTheme() {
    Off CORE the scrim thickens slightly so dense panels stay readable (Android SceneCanvas scrimBoost). */
 let sceneKind = 'city';
 function updateSceneKind() {
-  const a = curAct(), k = tabKey(S.tab) === 'GOLF' && a ? (a.id === 'golf' ? 'golf' : a.group === 'any' ? 'foot' : a.group) : 'city';
+  const a = curAct(), k = tabKey(S.tab) === 'GOLF' && a ? a.id : 'city';
   if (k === sceneKind) return; sceneKind = k; Scene.set({ kind: k });
   const sky = $('#sky'); sky.style.transition = 'none'; sky.style.opacity = 0.25; requestAnimationFrame(() => { sky.style.transition = 'opacity .7s'; sky.style.opacity = 1; });
 }
-function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#scrim').style.opacity = 1; document.documentElement.style.setProperty('--sb', ((1 - f) * 0.22).toFixed(3)); }
+function coreness() { const pw = $('#pager').querySelector('.page').offsetWidth || 1; if (!Prefs.liveSky) { $('#scrim').style.opacity = 0; return; } const f = Math.max(0, Math.min(1, 1 - $('#pager').scrollLeft / pw)); $('#scrim').style.opacity = 1; document.documentElement.style.setProperty('--sb', '0.22'); }
 function renderAll() { renderAlerts(); renderTop(); renderDock(); applyTheme(); renderCore(); renderScan(); renderTraj(); renderData(); renderGolf(); renderAir(); }
 
 /* ---------- data flow ---------- */
