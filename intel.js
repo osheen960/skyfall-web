@@ -10,22 +10,39 @@ const Voicebox = {
   MODELS: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3-flash', 'gemini-2.0-flash'],
   voiceFor: p => ({ deadpan: 'Charon', rebel: 'Puck', seer: 'Kore', caddie: 'Algenib', academy: 'Aoede', survivor: 'Fenrir', ghostwire: 'Zephyr', aeronaut: 'Iapetus' }[p] ? 'en-GB-Chirp3-HD-' + { deadpan: 'Charon', rebel: 'Puck', seer: 'Kore', caddie: 'Algenib', academy: 'Aoede', survivor: 'Fenrir', ghostwire: 'Zephyr', aeronaut: 'Iapetus' }[p] : 'en-GB-Chirp3-HD-Charon'),
   async hash(s) { const b = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s)); return [...new Uint8Array(b)].slice(0, 10).map(x => x.toString(16).padStart(2, '0')).join(''); },
+  /* Ask the API which models this key can use (names change often), best Flash first. Cached a day. */
+  async models(key) {
+    const c = Store.get('gModels', null); if (c && c.k === key.slice(-6) && Date.now() - c.at < 86400000) return c.list;
+    let list = [];
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': key } }), j = await r.json();
+      if (!r.ok) throw new Error(j.error?.message || 'HTTP ' + r.status);
+      list = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => m.name.replace(/^models\//, ''))
+        .filter(n => /^gemini-/.test(n) && !/(tts|image|live|audio|embed|vision|thinking|robotics|computer|exp)/.test(n));
+      const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+      const score = n => ver(n) * 100 + (/flash/.test(n) ? 20 : 0) - (/lite/.test(n) ? 8 : 0) - (/preview/.test(n) ? 3 : 0) + (/latest/.test(n) ? 1 : 0) - (/pro/.test(n) ? 30 : 0);
+      list.sort((a, b) => score(b) - score(a));
+    } catch (e) { if (/API key|PERMISSION|UNAUTH/i.test(e.message)) throw e; }
+    if (!list.length) list = this.MODELS;
+    Store.set('gModels', { k: key.slice(-6), at: Date.now(), list }); return list;
+  },
   async gemini(system, prompt, { search = false, temp = 0.9 } = {}) {
     const key = VoiceKeys.gemini; if (!key) throw new Error('No Gemini key');
     const body = { system_instruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: temp, maxOutputTokens: 1600 } };
     if (search) body.tools = [{ google_search: {} }];
-    const pref = Store.get('gModel', null); let last;
-    for (const m of [pref, ...this.MODELS.filter(x => x !== pref)].filter(Boolean)) {
+    const pref = Store.get('gModel', null), avail = await this.models(key); let first;
+    for (const m of [pref, ...avail.filter(x => x !== pref)].filter(Boolean).slice(0, 5)) {
       try {
         const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
         const j = await r.json();
-        if (!r.ok) { last = new Error(j.error?.message || 'HTTP ' + r.status); if (r.status === 401 || r.status === 403 || /API key/.test(last.message)) throw last; continue; }
+        if (!r.ok) { const er = new Error(`${m}: ${j.error?.message || 'HTTP ' + r.status}`); first = first || er; if (r.status === 401 || r.status === 403 || /API key/.test(er.message)) throw er; if (pref === m) Store.del('gModel'); continue; }
         const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
         if (!text.trim()) continue;
         Store.set('gModel', m); return text;
-      } catch (e) { last = e; if (/API key|PERMISSION/.test(e.message)) throw e; }
+      } catch (e) { first = first || e; if (/API key|PERMISSION/.test(e.message)) throw e; }
     }
-    throw last || new Error('No script');
+    if (search) return this.gemini(system, prompt, { search: false, temp });   // some models/tiers lack Search grounding
+    throw first || new Error('No script');
   },
   async write(system, prompt, opts) {
     const h = 's_' + await this.hash(system + '\0' + prompt), c = Store.get(h, null); if (c) return c;
