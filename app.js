@@ -750,7 +750,7 @@ function renderAlerts() {
   if (!list.length) { el.hidden = true; document.documentElement.style.setProperty('--alerth', '0px'); return; }
   const top = list[0];
   el.innerHTML = `<div class="al l${top.level}" style="--alc:${ALC[top.level]}"><div class="h"><i>⚠</i><span style="flex:1">${Alerts.name(top.level)} // ${esc(top.title)}</span><span>${alOpen ? '▾' : list.length > 1 ? `+${list.length - 1} ›` : '›'}</span></div>
-    ${alOpen ? list.map(a => `<div class="row"><div class="h" style="--alc:${ALC[a.level]};color:${ALC[a.level]}">${Alerts.name(a.level)} · ${esc(a.title)}</div><div class="b">${esc(a.body)}</div><div class="src">${esc(a.source)}</div></div>`).join('') + '<div class="src" style="margin-top:6px">TAP TO COLLAPSE · ALWAYS FOLLOW OFFICIAL EMERGENCY ADVICE</div>' : `<div class="b">${esc(top.body)}</div>`}</div>`;
+    ${alOpen ? `<div class="b">${esc(top.body)}</div><div class="src">${esc(top.source)}</div>` + list.slice(1).map(a => `<div class="row"><div class="h" style="--alc:${ALC[a.level]};color:${ALC[a.level]}">${Alerts.name(a.level)} · ${esc(a.title)}</div><div class="b">${esc(a.body)}</div><div class="src">${esc(a.source)}</div></div>`).join('') + '<div class="src" style="margin-top:6px">TAP TO COLLAPSE · ALWAYS FOLLOW OFFICIAL EMERGENCY ADVICE</div>' : `<div class="b">${esc(top.body)}</div>`}</div>`;
   el.hidden = false;
   requestAnimationFrame(() => document.documentElement.style.setProperty('--alerth', (el.offsetHeight + 6) + 'px'));
   if (!played.has(top.id)) { played.add(top.id); playTone(top.level); }
