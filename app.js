@@ -588,8 +588,10 @@ function teeSheet(g, slot) {
 }
 /** Your own tee/start time: scored from the forecast hours that cover the round (same as Android). */
 function customWindow(w, a, isGolf) {
-  if (S.customTee == null || S.customFor !== a.id + S.golfDay) return null;
-  const m = S.customTee, start = T(S.golfDay + 'T00:00') + Math.floor(m / 60) * HOUR, i = w.hourly.findIndex(h => h.time === start); if (i < 0) return null;
+  // Saturday golf defaults to a 06:00 tee until you pick something else.
+  const own = S.customTee != null && S.customFor === a.id + S.golfDay;
+  const m = own ? S.customTee : isGolf && S.golfSlot == null && dow(T(S.golfDay + 'T00:00')) === 6 ? 360 : null; if (m == null) return null;
+  const start = T(S.golfDay + 'T00:00') + Math.floor(m / 60) * HOUR, i = w.hourly.findIndex(h => h.time === start); if (i < 0) return null;
   const n = (isGolf ? Golf.ROUND : a.hours) + (m % 60 ? 1 : 0), hrs = w.hourly.slice(i, i + n);
   const win = isGolf ? Golf.window(hrs) : Activities.window(hrs, a);
   return win ? { ...win, tee: start + (m % 60) * MIN, custom: true } : null;
@@ -640,7 +642,7 @@ function renderGolf() {
   const g = Activities.day(gw, S.golfDay, act), custom = customWindow(gw, act, isGolf), slot = custom || g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
   const chips = days.map(d => { const b = Activities.day(gw, d.date, act).best;
     return `<button class="chip gchip" data-day="${d.date}" aria-pressed="${d.date === g.date}"><span class="l">${d.date === t0 ? 'TODAY' : dayShort(d.date)}</span><span class="v" style="color:${b ? scoreColor(b.score) : 'var(--faint)'}">${b ? b.score : '--'}</span></button>`; }).join('');
-  const cv = S.customTee != null && S.customFor === act.id + S.golfDay ? S.customTee : null, cvs = cv == null ? '' : String(Math.floor(cv / 60)).padStart(2, '0') + ':' + String(cv % 60).padStart(2, '0');
+  const cvs = custom ? hm(custom.tee) : '';
   const setTee = `<label class="tee ${custom ? 'set' : ''}" aria-pressed="${!!custom}" style="border-color:${rgba(ac, .5)}"><span class="l ac">${custom ? cvs : isGolf ? 'SET TEE' : 'SET START'}</span><span class="v" style="color:${custom ? scoreColor(custom.score) : ac}">${custom ? custom.score : '⌚'}</span><input type="time" id="customTee" value="${cvs || (slot ? hm(slot.tee) : '08:00')}" aria-label="Set your own ${isGolf ? 'tee' : 'start'} time"></label>`;
   const tees = setTee + g.windows.map(t => `<button class="tee" data-tee="${t.tee}" aria-pressed="${t === slot}" style="border-color:${rgba(scoreColor(t.score), .35)}"><span class="l">${hm(t.tee)}${t === g.best ? '◆' : ''}</span><span class="v" style="color:${scoreColor(t.score)}">${t.score}</span></button>`).join('');
   const tabs = ['BRIEF', 'SCORE', 'FLIGHT', 'SHEET'].filter(t => isGolf || t !== 'FLIGHT').map(t => `<button data-gtab="${t}" aria-pressed="${S.golfTab === t}">${t}</button>`).join('');
