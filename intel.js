@@ -76,7 +76,7 @@ const Voicebox = {
   style() {
     const p = Voice.persona();
     const s = [Voice.line('SITREP', 'CLOUDY', 1), Voice.line('THERMAL', 'SWING', 2), Voice.line('BRIEF', 'BYE', 0), Voice.line('NEWS', 'INTRO', 0)].filter(Boolean).join(' | ');
-    return `Persona: ${p ? p.name : 'Deadpan'} - ${p ? p.tagline : 'dark, dry, wildly unhinged humour'}. Sample lines in this voice: ${s}. Sarcasm and dark humour can be as extreme as the persona allows, but aim them at the weather, the universe, fate and the situation: never name-call, insult or belittle the listener.`;
+    return `Persona: ${p ? p.name : 'Deadpan'} - ${p ? p.tagline : 'dark, dry, wildly unhinged humour'}. Sample lines in this voice: ${s}. Go unhinged: maximum sarcasm, absurd escalation and pitch-black humour, fully in this persona's voice and world, like the sample lines but wilder. Aim it all at the weather, the universe, fate and the situation: never name-call, insult or belittle the listener.`;
   },
   RULES: `
 Rules:

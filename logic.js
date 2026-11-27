@@ -771,12 +771,18 @@ const Briefing = {
     const p = Voice.persona(), c = w.current, d = today(w), seed = Math.floor(T(dkey(c.time) + 'T00:00') / DAY);
     const tmax = R(d ? d.max : c.temperature), tmin = R(d ? d.min : c.temperature);
     const dt = new Date(c.time), date = `${DOWL[dt.getUTCDay()]} ${dt.getUTCDate()} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][dt.getUTCMonth()]}`;
-    const vars = { city, date, temp: R(c.temperature), tmax, tmin };
+    const now = c.time, rest = w.hourly.filter(h => dkey(h.time) === dkey(now) && h.time >= now - (now % HOUR));
+    const pop = Math.max(0, ...rest.map(h => h.pop || 0)), wetH = rest.find(h => (h.pop || 0) >= 40);
+    const vars = { city, date, temp: R(c.temperature), tmax, tmin, pop, time: wetH ? hm(wetH.time) : 'later', uv: R((d && d.uvMax) || 0) };
     const l = (k, f) => Voice.fill(Voice.line('BRIEF', k, seed) || f, vars);
     const hr = new Date(localNow(w.off)).getUTCHours(), period = hr >= 5 && hr <= 11 ? 'MORNING' : hr <= 16 && hr >= 12 ? 'AFTERNOON' : hr >= 17 && hr <= 20 ? 'EVENING' : 'NIGHT';
     const occ = Occasions.today(dkey(c.time)).map(o => Occasions.line(o, seed)).filter(Boolean).join(' ');
     const kicks = (p && p.lines && p.lines.KICK && p.lines.KICK.ANY) || [], kick = kicks.length ? kicks[fmod(seed * 7 + hr, kicks.length)] : '';
-    const body = `${l('HELLO_' + period, 'Hello.')}${occ ? ' ' + occ : ''} ${city}, ${date}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()}, heading for ${tmin}–${tmax}°. ${this.facts(w).slice(0, 3).join(' ')} ${kick} ${l('BYE', 'Skyfall out.')}`.replace(/\s+/g, ' ').trim();
+    // The personality's own reaction to the day (rain / heat / cold / nice), then the facts that matter.
+    const stormy = rest.some(h => h.code >= 95 && h.code <= 99);
+    const cond = pop >= 40 || stormy ? l('WET', 'Rain {pop}% from {time}.') : tmax >= 30 ? l('HOT', 'Peak {tmax}°.') : tmin <= 6 ? l('COLD', 'Low of {tmin}°.') : l('NICE', 'Pleasant day.');
+    const fx = this.facts(w), hl = [fx[0], cond, ...fx.slice(1, 3)].filter(Boolean).join(' ');
+    const body = `${l('HELLO_' + period, 'Hello.')}${occ ? ' ' + occ : ''} ${city}, ${date}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()}, heading for ${tmin}–${tmax}°. ${hl} ${kick} ${l('BYE', 'Skyfall out.')}`.replace(/\s+/g, ' ').trim();
     return { title: `${p.name} // Daily briefing`, body };
   },
   aiFacts(w, city) {
