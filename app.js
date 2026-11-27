@@ -271,7 +271,7 @@ document.addEventListener('submit', e => { if (e.target.id === 'askForm') { e.pr
 document.addEventListener('click', e => {
   const f = e.target.closest('[data-feel]'); if (f) { Smart.Comfort.vote(+f.dataset.feel); renderCore(); return; }
   if (e.target.closest('[data-unplan]')) { Smart.Plans.clear(); renderCore(); renderGolf(); return; }
-  const pl = e.target.closest('[data-pin]'); if (pl) { const a = curAct(), g = a && Activities.day(golfSource() && a.id === 'golf' ? golfSource() : S.w, S.golfDay, a), t = g && g.windows.find(x => x.tee === +pl.dataset.pin);
+  const pl = e.target.closest('[data-pin]'); if (pl) { const a = curAct(), g = a && Activities.day(golfSource() && a.id === 'golf' ? golfSource() : S.w, S.golfDay, a), t = g && ([customWindow(golfSource() && a.id === 'golf' ? golfSource() : S.w, a, a.id === 'golf')].find(x => x && x.tee === +pl.dataset.pin) || g.windows.find(x => x.tee === +pl.dataset.pin));
     if (t) { Smart.Plans.is(a.id, t) ? Smart.Plans.clear() : Smart.Plans.pin(a.id, t); askNotify(); renderGolf(); renderCore(); } }
 });
 const smartNote = (title, body, tag) => { toast(title); pushNote(title, body, 'smart-' + tag); };
@@ -504,7 +504,7 @@ function uplink(date, slot, g) {
     const text = fr ? base.split(' · ')[0] + ' · ' + fr : base;
     return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>${pinBtn(a.id, slot)}` : ''}`, { key: 'uplink', i: 0 }), text };
   }
-  const lines = Caddie.dayLines(g), gd = Activities.find('golf'), base0 = slot ? lines[slot.tee] : Caddie.banter(g);
+  const lines = Caddie.dayLines(g), gd = Activities.find('golf'), base0 = slot ? lines[slot.tee] || lines[slot.tee - slot.tee % HOUR] || Caddie.banter(g) : Caddie.banter(g);
   const fr = slot && gd && !/^Ah, such a beautiful morning!/.test(base0) ? ActFresh.get(gd, slot, date) : null, text = fr || base0;
   const freq = (121.5 + (Math.floor(T(date + 'T00:00') / DAY) % 37) * .25).toFixed(2);
   return { html: panel('Fairway uplink // transmission', `FQ ${freq}`, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} SLOT · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>${pinBtn('golf', slot)}` : ''}`, { key: 'uplink', i: 0 }), text };
@@ -586,6 +586,40 @@ function teeSheet(g, slot) {
   return panel(W.golf ? 'Tee sheet // golf score' : `Window sheet // ${W.name} score`, 'G-04', `<div class="tiny" style="margin-bottom:8px">${W.golf ? 'TAP A TEE TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A 4H ROUND' : `TAP A START TIME TO INSPECT IT · SCORE = 100 MINUS WEATHER DEDUCTIONS FOR A ${W.hrs}H WINDOW`}</div>
     <div class="th" style="padding-bottom:4px"><span style="width:48px;font-size:8px">${W.sw}</span><span style="flex:1;font-size:8px">SCORE /100</span><span style="width:42px;font-size:8px">RAIN</span><span style="width:50px;font-size:8px">WIND</span><span style="width:42px;font-size:8px">LIMIT</span></div>${rows}`, { key: 'gsheet', i: 0 });
 }
+/** Your own tee/start time: scored from the forecast hours that cover the round (same as Android). */
+function customWindow(w, a, isGolf) {
+  if (S.customTee == null || S.customFor !== a.id + S.golfDay) return null;
+  const m = S.customTee, start = T(S.golfDay + 'T00:00') + Math.floor(m / 60) * HOUR, i = w.hourly.findIndex(h => h.time === start); if (i < 0) return null;
+  const n = (isGolf ? Golf.ROUND : a.hours) + (m % 60 ? 1 : 0), hrs = w.hourly.slice(i, i + n);
+  const win = isGolf ? Golf.window(hrs) : Activities.window(hrs, a);
+  return win ? { ...win, tee: start + (m % 60) * MIN, custom: true } : null;
+}
+let cpHits = [];
+function renderCoursePicker() {
+  const row = (c, i, kind) => `<button data-cp="${kind}:${i}"><b>${esc(c.name)}${courseChosen() && c.name === COURSE.name || !courseChosen() && kind === 'l' && i === 0 ? '  ✓' : ''}</b><span>${esc(c.region.toUpperCase())}</span></button>`;
+  const list = (CATALOG.courses || []).map(c => ({ name: c[1], region: c[2], lat: c[3], lon: c[4] }));
+  $('#cpRes').innerHTML = (cpHits.length ? '<div class="cp-h">USE A PLACE AS YOUR COURSE</div>' + cpHits.map((p, i) => row({ name: 'Golf near ' + p.name, region: p.region }, i, 'h')).join('') : '')
+    + '<div class="cp-h">COURSES</div>' + list.map((c, i) => row(c, i, 'l')).join('') + '<button data-cp="reset"><b style="color:var(--ac);font-size:13px">RESET TO ALBERT PARK (DEFAULT)</b></button>';
+  renderCoursePicker.list = list;
+}
+function pickCourse(c) {
+  setCourse(c); S.golfW = null; S.golfSlot = null; S.customTee = null; $('#coursePick').hidden = true;
+  loadFromCache(); renderAll(); Repo.refreshForecast(COURSE.lat, COURSE.lon, 20 * MIN).then(ch => { if (ch) { loadFromCache(); renderAll(); } }).catch(e => toast(e.message));
+}
+$('#cpClose').addEventListener('click', () => { $('#coursePick').hidden = true; });
+let cpTimer;
+$('#cpq').addEventListener('input', e => { clearTimeout(cpTimer); const q = e.target.value; cpTimer = setTimeout(async () => { try { cpHits = q.trim().length > 1 ? (await OM.search(q)).slice(0, 6) : []; } catch { cpHits = []; } renderCoursePicker(); }, 350); });
+$('#cpRes').addEventListener('click', e => {
+  const b = e.target.closest('[data-cp]'); if (!b) return;
+  if (b.dataset.cp === 'reset') return pickCourse(null);
+  const [k, i] = b.dataset.cp.split(':');
+  if (k === 'l') { const c = renderCoursePicker.list[+i]; return pickCourse(+i === 0 ? null : c); }
+  const p = cpHits[+i]; pickCourse({ name: 'Golf near ' + p.name, region: p.region, lat: p.lat, lon: p.lon });
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'customTee' || !e.target.value) return;
+  const [h, m] = e.target.value.split(':').map(Number), a = curAct(); S.customTee = h * 60 + m; S.customFor = a.id + S.golfDay; renderGolf();
+});
 function renderGolf() {
   const el = $('#p-golf'); pIndex = 0;
   const act = curAct(); if (!act) { el.innerHTML = ''; return; }
@@ -594,19 +628,21 @@ function renderGolf() {
   const course = isGolf && nearCourse(), gw = course ? S.golfW : S.w;
   if (S.golfFor !== act.id) { S.golfFor = act.id; S.golfDay = null; S.golfSlot = null; }
   if (!isGolf && S.golfTab === 'FLIGHT') S.golfTab = 'BRIEF';
-  const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${COURSE.name.toUpperCase()}</div>
-    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${COURSE.region.toUpperCase()} · ${Math.abs(COURSE.lat).toFixed(3)}°S ${COURSE.lon.toFixed(3)}°E · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M` : 'ACQUIRING COURSE FORECAST…'}</div></div></div>`;
+  const banner = ready => `<div class="banner"><i class="${ready ? '' : 'wait'}"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">COURSE LOCK · ${esc(COURSE.name.toUpperCase())}</div>
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">${ready ? `${esc(COURSE.region.toUpperCase())} · ${Math.abs(COURSE.lat).toFixed(3)}°${COURSE.lat < 0 ? 'S' : 'N'} ${Math.abs(COURSE.lon).toFixed(3)}°${COURSE.lon < 0 ? 'W' : 'E'} · SYNC T+${R((Date.now() - S.golfW.fetchedAt) / MIN)}M` : 'ACQUIRING COURSE FORECAST…'}</div></div><button class="bchg" data-course>CHANGE ›</button></div>`;
   const actBanner = () => `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">${esc(act.name.toUpperCase())} // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
     <div class="m faint" style="font-size:8px;letter-spacing:1px">${act.hours}H WINDOWS · IDEAL ${Math.trunc(act.tLo)}–${Math.trunc(act.tHi)}° · ${act.windMin > 0 ? `WIND ${Math.trunc(act.windMin)}–${Math.trunc(act.windMax)} KM/H` : `WIND ≤${Math.trunc(act.windMax)} KM/H`}</div></div></div>`;
   const generic = () => !isGolf ? actBanner() : `<div class="banner"><i style="background:var(--ac)"></i><div><div class="m ac" style="font-size:10px;letter-spacing:1.5px">GOLF // ${esc((S.place ? S.place.name : 'Your location').toUpperCase())}</div>
-    <div class="m faint" style="font-size:8px;letter-spacing:1px">GENERIC CONDITIONS FOR YOUR LOCATION · NO COURSE LOCK</div></div></div>`;
+    <div class="m faint" style="font-size:8px;letter-spacing:1px">GENERIC CONDITIONS FOR YOUR LOCATION · NO COURSE LOCK</div></div><button class="bchg" data-course>PICK COURSE ›</button></div>`;
   if (!gw) { el.innerHTML = `<div class="col">${sw}${course ? banner(false) : generic()}</div>`; return; }
   const t0 = dkey(gw.current.time), days = gw.daily.slice(0, 7);
   if (!S.golfDay || !dayOf(gw, S.golfDay)) { const def = Activities.defaultDay(gw, act); S.golfDay = days.some(d => d.date === def) ? def : t0; }
-  const g = Activities.day(gw, S.golfDay, act), slot = g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
+  const g = Activities.day(gw, S.golfDay, act), custom = customWindow(gw, act, isGolf), slot = custom || g.windows.find(x => x.tee === S.golfSlot) || g.best, ac = AC();
   const chips = days.map(d => { const b = Activities.day(gw, d.date, act).best;
     return `<button class="chip gchip" data-day="${d.date}" aria-pressed="${d.date === g.date}"><span class="l">${d.date === t0 ? 'TODAY' : dayShort(d.date)}</span><span class="v" style="color:${b ? scoreColor(b.score) : 'var(--faint)'}">${b ? b.score : '--'}</span></button>`; }).join('');
-  const tees = g.windows.map(t => `<button class="tee" data-tee="${t.tee}" aria-pressed="${t === slot}" style="border-color:${rgba(scoreColor(t.score), .35)}"><span class="l">${hm(t.tee)}${t === g.best ? '◆' : ''}</span><span class="v" style="color:${scoreColor(t.score)}">${t.score}</span></button>`).join('');
+  const cv = S.customTee != null && S.customFor === act.id + S.golfDay ? S.customTee : null, cvs = cv == null ? '' : String(Math.floor(cv / 60)).padStart(2, '0') + ':' + String(cv % 60).padStart(2, '0');
+  const setTee = `<label class="tee ${custom ? 'set' : ''}" aria-pressed="${!!custom}" style="border-color:${rgba(ac, .5)}"><span class="l ac">${custom ? cvs : isGolf ? 'SET TEE' : 'SET START'}</span><span class="v" style="color:${custom ? scoreColor(custom.score) : ac}">${custom ? custom.score : '⌚'}</span><input type="time" id="customTee" value="${cvs || (slot ? hm(slot.tee) : '08:00')}" aria-label="Set your own ${isGolf ? 'tee' : 'start'} time"></label>`;
+  const tees = setTee + g.windows.map(t => `<button class="tee" data-tee="${t.tee}" aria-pressed="${t === slot}" style="border-color:${rgba(scoreColor(t.score), .35)}"><span class="l">${hm(t.tee)}${t === g.best ? '◆' : ''}</span><span class="v" style="color:${scoreColor(t.score)}">${t.score}</span></button>`).join('');
   const tabs = ['BRIEF', 'SCORE', 'FLIGHT', 'SHEET'].filter(t => isGolf || t !== 'FLIGHT').map(t => `<button data-gtab="${t}" aria-pressed="${S.golfTab === t}">${t}</button>`).join('');
   const none = panel('No window', null, '<div class="m dim" style="font-size:11px">NO PLAYABLE DAYLIGHT WINDOW IN FORECAST RANGE</div>', { key: 'nowin', i: 0 });
   let body = '', up = null;
@@ -614,7 +650,7 @@ function renderGolf() {
   else if (S.golfTab === 'SCORE') body = slot ? breakdown(slot) : none;
   else if (S.golfTab === 'FLIGHT') body = slot ? flight(slot) : none;
   else body = teeSheet(g, slot);
-  el.innerHTML = `<div class="col" style="gap:10px">${sw}${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div>${tees ? `<div class="hs">${tees}</div>` : ''}<div class="seg">${tabs}</div>${body}</div>`;
+  el.innerHTML = `<div class="col" style="gap:10px">${sw}${course ? banner(true) : generic()}<div class="hs" data-chips="golf" style="gap:8px">${chips}</div><div class="hs">${tees}</div><div class="seg">${tabs}</div>${body}</div>`;
   mountPanels(el);
   if (up) typeUplink($('#uplink'), up.text);
   if (S.golfTab === 'SCORE') runCalc($('#calc'));
@@ -649,7 +685,7 @@ function renderAir() {
 }
 
 /* ---------- golf location: Albert Park only when you're in Melbourne ---------- */
-const nearCourse = () => !S.place || Obs.distanceKm(S.place.lat, S.place.lon, COURSE.lat, COURSE.lon) <= 50;
+const nearCourse = () => courseChosen() || !S.place || Obs.distanceKm(S.place.lat, S.place.lon, COURSE.lat, COURSE.lon) <= 50;
 const golfSource = () => (nearCourse() ? S.golfW || S.w : S.w);
 
 /* ---------- chrome ---------- */
@@ -657,7 +693,7 @@ const sel = () => S.w ? forDay(S.w, S.coreDay || dkey(S.w.current.time)) : null;
 function toast(msg) { const t = $('#toast'); if (!msg) { t.hidden = true; return; } t.textContent = '⚠ ' + msg.toUpperCase(); t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 6000); }
 function renderTop() {
   const a0 = curAct(), atCourse = tabKey(S.tab) === 'GOLF' && a0 && a0.id === 'golf' && nearCourse() && S.golfW;
-  const w = atCourse ? S.golfW : S.w, name = atCourse ? 'Albert Park' : S.place ? S.place.name : 'SKYFALL';
+  const w = atCourse ? S.golfW : S.w, name = atCourse ? COURSE.name.replace(/ Golf (Course|Club|Links)$/, '') : S.place ? S.place.name : 'SKYFALL';
   if ($('#placeName').dataset.v !== name) { $('#placeName').dataset.v = name; $('#placeName').dataset.done = ''; decodeText($('#placeName'), name.toUpperCase(), 700); }
   if (!w) return;
   const lat = atCourse ? COURSE.lat : S.place ? S.place.lat : w.lat, lon = atCourse ? COURSE.lon : S.place ? S.place.lon : w.lon;
@@ -965,7 +1001,8 @@ document.body.addEventListener('click', e => {
   if (day) { const which = day.closest('[data-chips]').dataset.chips; if (which === 'core') { S.coreDay = day.dataset.day; renderCore(); } else { S.golfDay = day.dataset.day; S.golfSlot = null; renderGolf(); } return; }
   const go = t.closest('[data-go]'); if (go) { const k = go.dataset.go; if (k === 'GOLF') S.actId = Prefs.activities[0]; const gi = TABS.findIndex(x => x[1] === k); if (gi >= 0) { if (k === 'GOLF') { renderGolf(); renderDock(); } goTab(gi); } return; }
   const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; Smart.Habits.record(S.actId); renderGolf(); renderDock(); renderTop(); updateSceneKind(); return; }
-  const tee = t.closest('[data-tee]'); if (tee) { S.golfSlot = +tee.dataset.tee; renderGolf(); return; }
+  const tee = t.closest('[data-tee]'); if (tee) { S.golfSlot = +tee.dataset.tee; S.customTee = null; renderGolf(); return; }
+  if (t.closest('[data-course]')) { cpHits = []; $('#cpq').value = ''; renderCoursePicker(); $('#coursePick').hidden = false; return; }
   const gt = t.closest('[data-gtab]'); if (gt) { S.golfTab = gt.dataset.gtab; renderGolf(); return; }
   const hd = t.closest('[data-hand]'); if (hd) { S.hand = hd.dataset.hand; Store.set('hand', S.hand); renderGolf(); return; }
   if (t.id === 'keySave') {

@@ -243,6 +243,14 @@ h1{margin:0;font:600 calc(26px * var(--ds))/1.15 var(--fd),system-ui,sans-serif;
 /* ---- overlays ---- */
 .overlay{position:fixed;inset:0;z-index:30;background:rgba(var(--voidrgb),.95);display:flex;justify-content:center;padding:calc(env(safe-area-inset-top) + 16px) 20px 20px}
 .overlay[hidden]{display:none}
+#cpRes button{display:block;width:100%;padding:10px 0;border-bottom:1px solid rgba(var(--inkrgb),.07);text-align:left}
+#cpRes b{font:600 calc(16px * var(--ds)) var(--fd),system-ui,sans-serif;color:var(--ink)}
+#cpRes span{display:block;font:calc(10px * var(--ls)) var(--fl),monospace;letter-spacing:1px;color:var(--dim)}
+#cpRes .cp-h{font:calc(9px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;color:var(--ac);padding:12px 0 2px}
+.bchg{margin-left:auto;background:none;border:0;color:var(--ac);font:calc(10px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;cursor:pointer;padding:6px}
+.tee.set{border-color:var(--ac)!important}
+.tee input[type=time]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.tee{position:relative}
 .sheet{width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;font:calc(11px * var(--ls)) var(--fl),monospace;letter-spacing:2px;color:var(--ac)}
 button.txt{font:calc(12px * var(--ls)) var(--fl),monospace;letter-spacing:1px;color:var(--ac);padding:8px 4px;min-height:40px}

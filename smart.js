@@ -73,7 +73,7 @@ const Smart = {
     is(act, t) { const p = Store.get('plan', null); return !!p && p.a === act && p.t === t.tee; },
     status(w, p) {
       const a = Activities.find(p.a); if (!a) return null;
-      const win = Activities.day(w, dkey(p.t), a).windows.find(x => x.tee === p.t); if (!win) return null;
+      const win = Activities.day(w, dkey(p.t), a).windows.find(x => x.tee === p.t - p.t % HOUR); if (!win) return null;
       const drop = p.s - win.score, wetter = win.pop - p.p, worse = drop >= 15 || wetter >= 30;
       const why = wetter >= 30 ? `rain chance up to ${win.pop}% (was ${p.p}%)` : drop >= 15 ? `score ${win.score} (was ${p.s}), ${win.limiter.toLowerCase()} is the problem` : `still on: score ${win.score}, rain ${win.pop}%`;
       return { text: `${a.name} ${DOW[dow(p.t)]} ${hm(p.t)} · ${why}`, worse };

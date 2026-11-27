@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=47">
+<link rel="stylesheet" href="style.css?v=48">
 </head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -59,19 +59,27 @@
   </div>
 </div>
 
+<div id="coursePick" class="overlay" hidden role="dialog" aria-modal="true" aria-label="Select course">
+  <div class="sheet">
+    <div class="sheet-head"><span>SELECT // COURSE</span><button class="txt" id="cpClose">[CLOSE]</button></div>
+    <input id="cpq" type="search" placeholder="SEARCH ANY SUBURB OR TOWN" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    <div id="cpRes"></div>
+  </div>
+</div>
+
 <div id="settings" role="dialog" aria-modal="true" aria-label="Settings" hidden></div>
 <div id="ambient" class="overlay ambient" hidden>
   <div class="amb-read"><div id="ambTemp"></div><div id="ambSky" class="mono"></div><div id="ambClock" class="mono"></div></div>
   <button class="txt amb-close" id="ambClose">[EXIT AMBIENT]</button>
 </div>
 
-<script src="catalog.js?v=47"></script>
-<script src="logic.js?v=47"></script>
-<script src="city.js?v=47"></script>
-<script src="scene.js?v=47"></script>
-<script src="core.js?v=47"></script>
-<script src="intel.js?v=47"></script>
-<script src="smart.js?v=47"></script>
-<script src="app.js?v=47"></script>
+<script src="catalog.js?v=48"></script>
+<script src="logic.js?v=48"></script>
+<script src="city.js?v=48"></script>
+<script src="scene.js?v=48"></script>
+<script src="core.js?v=48"></script>
+<script src="intel.js?v=48"></script>
+<script src="smart.js?v=48"></script>
+<script src="app.js?v=48"></script>
 </body>
 </html>

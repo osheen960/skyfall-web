@@ -9,7 +9,11 @@ const Store = {
 
 /** BoM refuses browser requests, so a GitHub Actions job republishes the same station readings as obs.json beside the site. */
 const OBS_ENABLED = true;
-const COURSE = { name: 'Albert Park Golf Course', region: 'Melbourne VIC', lat: -37.845, lon: 144.972 };
+/** Golf course: Albert Park, Melbourne by default (used within 50 km of it); a course you pick is always used. */
+const COURSE_DEFAULT = { name: 'Albert Park Golf Course', region: 'Melbourne VIC', lat: -37.845, lon: 144.972 };
+let COURSE = Store.get('course', null) || COURSE_DEFAULT;
+const courseChosen = () => !!Store.get('course', null);
+function setCourse(c) { if (c) Store.set('course', c); else Store.del('course'); COURSE = c || COURSE_DEFAULT; }
 const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR, SLOT = 15 * MIN;
 const slotStart = (now = Date.now()) => now - now % SLOT;
 /** Forecast points snap to a 0.05° (~5 km) grid, the same in the Android app, so both ask Open-Meteo for the same point. */
