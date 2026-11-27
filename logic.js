@@ -646,9 +646,12 @@ const Activities = {
     const span = `${hm(t.tee)}–${hm(t.tee + a.hours * HOUR)}`, Q = CATALOG.quips;
     const pl = Voice.line('ACT', t.limiter, 0);
     const pool = (Q[a.group] && Q[a.group][t.limiter]) || Q.any[t.limiter] || Q.any.NONE;
-    const o = pl ? (Voice.id === 'deadpan' ? [pl, ...pool] : [pl]) : pool;   // Deadpan (built-in voice) rotates the pool too
+    // Fact (varied wording) + a closer in the personality's voice; combinations change by day, slot and activity.
+    const P = Voice.persona(), facts = (CATALOG.actfact || {})[t.limiter] || [], kick = (P && P.lines && P.lines.KICK && P.lines.KICK.ANY) || [];
+    const closers = [...(pl ? [pl] : []), ...kick], combos = facts.flatMap(f => closers.map(k => f + ' ' + k));
+    const o = combos.length ? (Voice.id === 'deadpan' ? [...combos, ...pool] : combos) : pool;
     const hid = [...a.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
-    const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) * 7 + new Date(t.tee).getUTCHours() * 3 + hid, o.length)]
+    const line = o[fmod(Math.floor(T(date + 'T00:00') / DAY) * 7919 + new Date(t.tee).getUTCHours() * 104729 + hid * 31, o.length)]
       .replaceAll('{N}', a.name).replaceAll('{n}', a.name.toLowerCase()).replaceAll('{pop}', t.pop).replaceAll('{mm}', f1(t.mm))
       .replaceAll('{wind}', R(t.wind)).replaceAll('{gust}', R(t.gust)).replaceAll('{tmax}', isNaN(t.tMax) ? '--' : R(t.tMax))
       .replaceAll('{tmin}', isNaN(t.tMin) ? '--' : R(t.tMin)).replaceAll('{uv}', R(t.uv)).replaceAll('{score}', t.score);

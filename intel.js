@@ -173,10 +173,13 @@ const ActFresh = {
     const c = Store.get(k, null); if (c) return c;
     if (this.busy[k]) return null; this.busy[k] = true;
     const hm = ms => new Date(ms).toISOString().slice(11, 16);
-    const sys = `You write the one-line activity briefing on the Skyfall weather console.\n${Voicebox.style()}\nRules: 14 to 34 words, in the persona's voice and humour, about this specific activity and these exact conditions; name what limits it and what to do about it. Make it different from a generic line; never repeat stock phrases. Use only the numbers given. Plain text, no emojis, no markdown, no time range.`;
+    const angles = ['a sports commentator', 'a nature documentary narrator', 'a film-noir detective', 'a corporate memo', 'a conspiracy theorist', 'a weather god with a grudge', 'an over-dramatic movie trailer', 'a strict PE teacher', 'a travel brochure that is lying', 'a mission control briefing', 'a sommelier describing the air', 'a heist crew planning the window', 'an exhausted parent', 'a medieval herald', "a stand-up comic's opener", 'a horoscope'];
+    const angle = angles[Math.abs(Math.floor(t.tee / 3600000) * 7 + [...a.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0)) % angles.length];
+    const recent = (Store.get('recentAct', []) || []).slice(-8);
+    const sys = `You write the one-line activity briefing on the Skyfall weather console.\n${Voicebox.style()}\nRules: 14 to 34 words, in the persona's voice and humour, about this specific activity and these exact conditions; name what limits it and what to do about it. This time, frame the joke like ${angle} (still in the persona's voice). Use only the numbers given. Plain text, no emojis, no markdown, no time range.` + (recent.length ? `\nDo NOT reuse any joke, image or phrase from these recent lines:\n- ${recent.join('\n- ')}` : '');
     const ded = (t.deductions || []).map(d => `${d.label} -${d.points}`).join('; ');
     const p = `Activity: ${a.name}. Date: ${date}. Start ${hm(t.tee)} for ${a.hours}h. Score ${t.score}/100. Temp ${Math.round(t.tMin)}-${Math.round(t.tMax)}C, rain chance ${t.pop}% (${(t.mm || 0).toFixed(1)}mm), wind ${Math.round(t.wind)} gusting ${Math.round(t.gust)}km/h, UV ${Math.round(t.uv)}, storm ${!!t.storm}. Main limiter: ${t.limiter}. Deductions: ${ded || 'none'}.`;
-    Voicebox.gemini(sys, p, { temp: 1 }).then(x => { const v = x.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim(); if (v.length > 8) { Store.set(k, v); window.dispatchEvent(new Event('skyfall:refresh')); } }).catch(() => {}).finally(() => { delete this.busy[k]; });
+    Voicebox.gemini(sys, p, { temp: 1 }).then(x => { const v = x.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim(); if (v.length > 8) { Store.set(k, v); Store.set('recentAct', [...(Store.get('recentAct', []) || []), v].slice(-12)); window.dispatchEvent(new Event('skyfall:refresh')); } }).catch(() => {}).finally(() => { delete this.busy[k]; });
     return null;
   },
 };
