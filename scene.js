@@ -401,4 +401,4 @@ function moonPhase(ms) { const synodic = 29.530588853, ref = Date.UTC(2000, 0, 6
 /* Activity scene photos: lazy-loaded, cached; null until ready or if an activity has none. */
 const Photos = { img: {}, bad: new Set(),
   get(id) { if (this.bad.has(id)) return null; const i = this.img[id]; if (i) return i.complete && i.naturalWidth ? i : null;
-    const n = new Image(); n.decoding = 'async'; n.onerror = () => this.bad.add(id); n.src = 'scenes/' + id + '.jpg?v=2'; this.img[id] = n; return null; } };
+    const n = new Image(); n.decoding = 'async'; n.onerror = () => this.bad.add(id); n.src = 'scenes/' + id + '.jpg?v=3'; this.img[id] = n; return null; } };
