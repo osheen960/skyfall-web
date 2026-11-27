@@ -844,6 +844,11 @@ function stResults() {
 function row(kind, id, label, sub, on) {
   return `<button class="st-row" role="switch" data-${kind}="${id}" aria-checked="${on}"><div><b>${esc(label)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div><i class="st-sw"></i></button>`;
 }
+let sceneCredits = null;
+function creditsHtml() {
+  if (!sceneCredits) { sceneCredits = []; fetch('scenes/credits.json').then(r => r.json()).then(j => { sceneCredits = j; const el = $('#stCredits'); if (el) el.innerHTML = creditsHtml(); }).catch(() => { }); return ''; }
+  return sceneCredits.map(c => `${esc((Activities.find(c.id) || { name: c.id }).name)} · <a href="${esc(c.link)}" target="_blank" rel="noopener" style="color:var(--ac)">${esc(c.by)}</a> on Unsplash`).join('<br>');
+}
 function renderSettings() {
   const el = $('#settings'), scroll = el.querySelector('.st-body')?.scrollTop || 0;
   const mine = Prefs.activities.map((id, i) => { const a = Activities.find(id); return a ? `<span class="st-mine ${i === 0 ? 'first' : ''}" data-first="${id}">${i === 0 ? '★ ' : ''}${esc(a.name)}<i data-toggle="${id}" aria-label="Remove ${esc(a.name)}">×</i></span>` : ''; }).join('');
@@ -899,6 +904,7 @@ function renderSettings() {
     <section class="st-card" data-st="5"><h3>Hosting</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The site is static files on GitHub Pages. GitHub, like any web host, may log visitors' IP addresses; Skyfall itself collects nothing.</div></section>
     <section class="st-card" data-st="5"><h3>Location</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Location is only used in your browser to pick your forecast, and only if you allow it. You can always search for a place instead.</div></section>
     <section class="st-card" data-st="5"><h3>The Android app</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The app works the same way: everything is stored on the phone, alerts and briefings are worked out on the device, and it only contacts the public weather and news services, plus Google Gemini if you add your own key for fresh daily lines.</div></section>
+    <section class="st-card" data-st="5"><h3>Activity photos</h3><div class="sub">From Unsplash, under the Unsplash License. Served with this site; your browser loads only the one for the activity you're viewing.</div><div id="stCredits" class="sub" style="font-size:12px;line-height:1.6;color:var(--ink)">${creditsHtml()}</div></section>
     <button class="st-reset" id="stReset">Reset to defaults</button>
     <div class="st-foot">SAVED ON THIS DEVICE. WEATHER DATA IS ALWAYS OPEN-METEO.</div>
   </div>`;
