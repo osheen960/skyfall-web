@@ -138,15 +138,43 @@ const Smart = {
     if (c) { const adv = this.Commutes.advice(w, await this.Commutes.work(), c, 60); if (adv && this.once(`commute-${today}-${adv.split(':')[0]}`, 12)) note('Commute', adv, 'commute'); }
   },
   /* ---------- Ask Skyfall ---------- */
-  askContext(w, city, alerts, acts) {
-    const c = w.current, L = [];
-    L.push(`Location: ${city}. Local now: ${new Date(c.time).toISOString().slice(0, 16)}. Now ${R(c.temperature)}C (feels ${R(c.feelsLike)}C), ${Codes.label(c.code)}, wind ${R(c.windSpeed)} gust ${R(c.windGusts)} km/h.`);
-    L.push('Next 48 hours (time temp rain% mm wind gust code):');
-    w.hourly.slice(0, 48).forEach(h => L.push(`${new Date(h.time).toISOString().slice(5, 16)} ${R(h.temperature)} ${h.pop || 0} ${f1(h.precip)} ${R(h.wind)} ${R(h.gust)} ${Codes.label(h.code)}`));
-    L.push('Daily (date min max rain% mm uv):');
-    w.daily.slice(0, 10).forEach(d => L.push(`${d.date} ${R(d.min)} ${R(d.max)} ${d.popMax || 0} ${f1(d.precipSum || 0)} ${R(d.uvMax || 0)}`));
-    L.push('Warnings: ' + (alerts.map(a => a.title).join('; ') || 'none'));
-    acts.map(id => Activities.find(id)).filter(Boolean).forEach(a => L.push(`${a.name} best windows: ` + w.daily.slice(0, 7).map(d => Activities.day(w, d.date, a).best).filter(Boolean).map(b => `${new Date(b.tee).toISOString().slice(0, 16)} score ${b.score} limiter ${b.limiter}`).join('; ')));
+  /** Resolves today / tomorrow / weekday / "6 am" in code so the model never does date maths (same as Android). */
+  askTarget(q, now) {
+    const t = q.toLowerCase(), today = T(dkey(now) + 'T00:00');
+    const names = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    let day = today;
+    if (/day after tomorrow/.test(t)) day = today + 2 * DAY;
+    else if (/\b(tomorrow|tmrw|tmr|tomoz)\b/.test(t)) day = today + DAY;
+    else if (!/\b(today|tonight|this (morning|arvo|afternoon|evening))\b/.test(t)) {
+      const i = names.findIndex(n => new RegExp(`\\b(${n}|${n.slice(0, 3)}\\b)`).test(t));
+      if (i >= 0) day = today + fmod(i - dow(today), 7) * DAY;
+    }
+    const m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,2}):(\d{2})\b/);
+    let hour = m ? (m[1] ? (+m[1] % 12) + (m[3] === 'pm' ? 12 : 0) : +m[4]) : /morning/.test(t) ? 8 : /arvo|afternoon/.test(t) ? 14 : /evening|tonight/.test(t) ? 19 : null;
+    if (hour != null) hour = Math.max(0, Math.min(23, hour));
+    return { day: dkey(day), hour };
+  },
+  dayName(date, today) {
+    const ms = T(date + 'T00:00'), M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const n = `${DOWL[dow(ms)]} ${+date.slice(8, 10)} ${M[+date.slice(5, 7) - 1]}`;
+    if (!/^\d{4}-/.test(today)) return n;
+    return date === today ? `today (${n})` : date === dkey(T(today + 'T00:00') + DAY) ? `tomorrow (${n})` : n;
+  },
+  askContext(w, city, alerts, acts, question = '') {
+    const c = w.current, today = dkey(c.time), L = [], { day, hour } = this.askTarget(question, c.time);
+    L.push(`Location: ${city}. It is now ${this.dayName(today, '-')}, ${hm(c.time)} local time. Today is ${this.dayName(today, '-')}; tomorrow is ${this.dayName(dkey(c.time + DAY), '-')}.`);
+    L.push(`Right now: ${R(c.temperature)}°C (feels ${R(c.feelsLike)}°C), ${Codes.label(c.code).toLowerCase()}, wind ${R(c.windSpeed)} km/h gusting ${R(c.windGusts)}.`, '');
+    L.push(`THE QUESTION IS ABOUT: ${this.dayName(day, today).toUpperCase()}${hour != null ? ` AT ${String(hour).padStart(2, '0')}:00` : ''}`);
+    const d = dayOf(w, day);
+    L.push(d ? `That day: ${R(d.min)}–${R(d.max)}°C, rain chance up to ${d.popMax || 0}%, ${f1(d.precipSum || 0)} mm total, UV ${R(d.uvMax || 0)}, sunrise ${hm(d.sunrise)}, sunset ${hm(d.sunset)}.` : 'That day is beyond the forecast range: say so.');
+    const hrs = w.hourly.filter(h => dkey(h.time) === day && hourOf(h.time) >= 5 && hourOf(h.time) <= 22);
+    if (hrs.length) { L.push('Hour by hour that day (time · temp · rain chance · mm · wind/gust km/h · sky):'); hrs.forEach(h => L.push(`${hm(h.time)} · ${R(h.temperature)}° · ${h.pop || 0}% · ${f1(h.precip)} mm · ${R(h.wind)}/${R(h.gust)} · ${Codes.label(h.code).toLowerCase()}`)); }
+    acts.map(id => Activities.find(id)).filter(Boolean).forEach(a => {
+      const g = Activities.day(w, day, a), at = hour != null ? g.windows.find(x => hourOf(x.tee) === hour) : null;
+      L.push(`${a.name} that day: ` + (!g.best ? 'no usable window.' : `best start ${hm(g.best.tee)} (score ${g.best.score}/100, main problem: ${g.best.limiter.toLowerCase()})` + (at ? `; starting at ${hm(at.tee)} scores ${at.score}/100 (rain ${at.pop}%, wind ${R(at.wind)} gust ${R(at.gust)}, main problem: ${at.limiter.toLowerCase()})` : '') + '.'));
+    });
+    L.push('Warnings: ' + (alerts.map(a => a.title).join('; ') || 'none'), '', 'Rest of the week (day · min–max · rain chance · mm):');
+    w.daily.slice(0, 7).forEach(x => L.push(`${this.dayName(x.date, today)} · ${R(x.min)}–${R(x.max)}° · ${x.popMax || 0}% · ${f1(x.precipSum || 0)} mm`));
     return L.join('\n');
   },
   /* The browser's built-in AI (Chrome's on-device Gemini Nano) when present, else the user's own Gemini key. */

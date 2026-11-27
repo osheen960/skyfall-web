@@ -262,8 +262,8 @@ function askPanel() {
 async function runAsk(q) {
   if (!q.trim() || askBusy || !S.w) return; askQ = q; askBusy = true; askA = ''; renderCore();
   const alerts = Prefs.alertsOn ? Alerts.model(S.w, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w)) : [];
-  const data = Smart.askContext(S.w, S.place ? S.place.name : 'your area', alerts, Prefs.activities), p = Voice.persona();
-  const sys = `You are Skyfall, a weather console. ${p ? `Persona: ${p.name} - ${p.tagline}.` : ''} Answer the user's question in 2-5 sentences of natural British English, in the persona's voice and humour, using ONLY the forecast data provided. Give a clear verdict first (yes/no/best time), then the numbers that matter. If the data doesn't cover it, say so. No markdown.`;
+  const data = Smart.askContext(S.w, S.place ? S.place.name : 'your area', alerts, Prefs.activities, q), p = Voice.persona();
+  const sys = `You are Skyfall, a weather console. ${p ? `Persona: ${p.name} - ${p.tagline}.` : ''} Answer the user's question in 2-5 sentences of natural British English, in the persona's voice and humour, using ONLY the forecast data provided. Give a clear verdict first (yes/no/best time), then the numbers that matter. If the data doesn't cover it, say so. No markdown. Answer about the day and time under THE QUESTION IS ABOUT, using that day's hours and activity scores; don't mix in other days unless asked. Refer to days only as written in the data (today, tomorrow, Saturday 28 November); never write ISO dates and never invent times or numbers. Aim the humour at the weather and the situation, never insult the user.`;
   try { askA = await Smart.ask(sys, `Forecast data:\n${data}\n\nQuestion: ${q.trim()}`); } catch (e) { askA = String(e.message || e).slice(0, 220); }
   askBusy = false; renderCore();
 }
