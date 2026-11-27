@@ -22,7 +22,7 @@ function computeTabs() {
   if (S.tab >= TABS.length) S.tab = 0;
 }
 const tabKey = i => (TABS[i] ? TABS[i][1] : '');
-const curAct = () => { if (!Prefs.activities.includes(S.actId)) S.actId = Prefs.activities[0]; return Activities.find(S.actId || '') || null; };
+const curAct = () => { if (!Prefs.activities.includes(S.actId)) { S.actId = Smart.Habits.suggest(Prefs.activities) || Prefs.activities[0]; if (S.actId) Smart.Habits.record(S.actId); } return Activities.find(S.actId || '') || null; };
 const GOOGLE_KEY = /^AIza[0-9A-Za-z_-]{35}$/;
 let INK = '#e6fbff', AMBER = '#ffb547', ALERT = '#ff4d6a', MAGENTA = '#ff3b30', GOOD = '#3dff9a', VOID = '#020409';
 function setPalette() {
@@ -225,11 +225,57 @@ function renderCore() {
     ${Prefs.hiddenCore.includes('quick') ? '' : quickGrid(w, isToday)}
     ${Prefs.hiddenCore.includes('loadout') ? '' : loadout(w, isToday)}
     ${Prefs.hiddenCore.includes('comms') ? '' : cm.html}
+    ${isToday && !Prefs.hiddenCore.includes('analysis') ? analysisPanel(S.w) : ''}
+    ${isToday && !Prefs.hiddenCore.includes('ask') ? askPanel() : ''}
   </div>`;
   mountPanels($('#p-core'));
   Core.mount($('#core'), w);
   if ($('#comms')) typeComms($('#comms'), cm.tx);
+  if ($('#anCons')) { fillAnalysis(); if (S.place) loadCons(); }
 }
+/* ---------- Analysis + Ask Skyfall (mirrors Android SmartUi) ---------- */
+let consFor = '', consList = [], askQ = '', askA = '', askBusy = false, workW = null;
+async function loadCons() {
+  const k = placeKey(S.place.lat, S.place.lon) + ':' + Math.floor(Date.now() / (3 * HOUR));
+  if (consFor !== k) { consFor = k; try { consList = await Smart.consensus(S.place.lat, S.place.lon); } catch { consList = []; } if (Smart.Commutes.get()) workW = await Smart.Commutes.work(); fillAnalysis(); }
+}
+function fillAnalysis() {
+  const el = $('#anCons'); if (el) el.innerHTML = consList.length ? consList.slice(0, 4).map(c => `<div class="an-row"><span class="faint">${DOW[dow(T(c.date + 'T00:00'))]}</span><span style="color:${[M('#ff7a3d'), M('#ffd23d'), GOOD][c.level]}">${esc(c.text)}</span></div>`).join('') : '<div class="an-line dim">Comparing forecast models…</div>';
+  const cm = $('#anCommute'), c = Smart.Commutes.get();
+  if (cm && c && S.w) { const adv = Smart.Commutes.advice(S.w, workW, c, 16 * 60); cm.innerHTML = adv ? `<div class="an-lbl">COMMUTE</div><div class="an-line">${esc(adv)}</div>` : ''; }
+}
+function analysisPanel(w) {
+  const bias = Smart.Bias.summary(), p = Smart.Plans.get(w), st = p && Smart.Plans.status(w, p), voted = Smart.Comfort.votedToday();
+  const body = `<div class="an-lbl">FORECAST CONFIDENCE</div><div id="anCons"></div>
+    <div class="an-sub">BoM, European, US and German models compared. Split = the forecast could go either way.</div>
+    ${bias ? `<div class="an-line dim" style="margin-top:8px">${esc(bias)}</div>` : ''}
+    <div class="an-lbl" style="margin-top:12px">HOW DID IT FEEL OUT THERE?</div>
+    <div class="an-btns">${[['Colder', 1], ['About right', 0], ['Warmer', -1]].map(([t, v]) => `<button data-feel="${v}" ${voted ? 'disabled' : ''}>${t}</button>`).join('')}</div>
+    <div class="an-sub">${esc(Smart.Comfort.label() || (voted ? 'Logged. Loadout tips adapt to you over a few days.' : 'One tap a day; loadout tips learn whether you run hot or cold.'))}</div>
+    ${st ? `<div class="an-lbl" style="margin-top:12px">WATCHED PLAN</div><div class="an-line" style="color:${st.worse ? M('#ff7a3d') : 'var(--ink)'}">${st.worse ? '⚠ ' : '✓ '}${esc(st.text)}</div><button class="an-link" data-unplan>STOP WATCHING</button>` : ''}
+    <div id="anCommute" style="margin-top:12px"></div>`;
+  return panel('Analysis // in your browser', 'AI-04', body, { key: 'analysis', i: 3 });
+}
+function askPanel() {
+  return panel('Ask Skyfall', 'Q-01', `<form class="ask" id="askForm"><input id="askQ" autocomplete="off" placeholder="Can I sail Sunday afternoon?" value="${esc(askQ)}"><button ${askBusy ? 'disabled' : ''}>${askBusy ? '…' : 'ASK ›'}</button></form>${askA ? `<div class="ask-a">${esc(askA)}</div>` : ''}`, { key: 'ask', i: 4 });
+}
+async function runAsk(q) {
+  if (!q.trim() || askBusy || !S.w) return; askQ = q; askBusy = true; askA = ''; renderCore();
+  const alerts = Prefs.alertsOn ? Alerts.model(S.w, S.pollenKey && S.pollen ? S.pollen : Air.estimate(S.w)) : [];
+  const data = Smart.askContext(S.w, S.place ? S.place.name : 'your area', alerts, Prefs.activities), p = Voice.persona();
+  const sys = `You are Skyfall, a weather console. ${p ? `Persona: ${p.name} - ${p.tagline}.` : ''} Answer the user's question in 2-5 sentences of natural British English, in the persona's voice and humour, using ONLY the forecast data provided. Give a clear verdict first (yes/no/best time), then the numbers that matter. If the data doesn't cover it, say so. No markdown.`;
+  try { askA = await Smart.ask(sys, `Forecast data:\n${data}\n\nQuestion: ${q.trim()}`); } catch (e) { askA = String(e.message || e).slice(0, 220); }
+  askBusy = false; renderCore();
+}
+document.addEventListener('submit', e => { if (e.target.id === 'askForm') { e.preventDefault(); runAsk($('#askQ').value); } });
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-feel]'); if (f) { Smart.Comfort.vote(+f.dataset.feel); renderCore(); return; }
+  if (e.target.closest('[data-unplan]')) { Smart.Plans.clear(); renderCore(); renderGolf(); return; }
+  const pl = e.target.closest('[data-pin]'); if (pl) { const a = curAct(), g = a && Activities.day(golfSource() && a.id === 'golf' ? golfSource() : S.w, S.golfDay, a), t = g && g.windows.find(x => x.tee === +pl.dataset.pin);
+    if (t) { Smart.Plans.is(a.id, t) ? Smart.Plans.clear() : Smart.Plans.pin(a.id, t); askNotify(); renderGolf(); renderCore(); } }
+});
+const smartNote = (title, body, tag) => { toast(title); pushNote(title, body, 'smart-' + tag); };
+async function smartTick() { if (S.w && S.place) try { await Smart.proactive(S.w, S.place, Prefs.activities, smartNote); } catch (e) { console.warn('smart', e.message); } }
 const typedSig = {};
 function typeComms(el, tx) {
   const stamp = el.dataset.stamp, sig = JSON.stringify(tx), done = typedSig.comms === sig; typedSig.comms = sig;
@@ -450,17 +496,18 @@ function scoreSummary(date, slot, g, i) {
     <div class="m" style="font-size:10px;letter-spacing:1px;margin-top:10px;color:${slot.limiter === 'NONE' ? ac : AMBER}">GRADE ${Golf.grade(slot.score)} · MAIN LIMITER: ${slot.limiter}</div>
     <div class="tiny" style="margin-top:6px">${W.golf ? 'THE SCORE IS PLAYABILITY FOR A 4-HOUR ROUND FROM THIS TEE TIME: 100 MINUS PENALTIES FOR LIGHTNING, RAIN, WIND, HEAT OR COLD AND UV. NOT A CHANCE OF RAIN.' : `THE SCORE IS HOW GOOD A ${W.hrs}-HOUR WINDOW FROM THIS START IS FOR ${W.name.toUpperCase()}: 100 MINUS PENALTIES FOR WHAT MATTERS TO IT. NOT A CHANCE OF RAIN.`}</div>`, { key: 'gscore', i });
 }
+const pinBtn = (id, t) => `<button class="an-link" data-pin="${t.tee}">${Smart.Plans.is(id, t) ? '◉ WATCHING THIS PLAN · TAP TO STOP' : '○ WATCH THIS PLAN · ALERT ME IF IT GETS WORSE'}</button>`;
 function uplink(date, slot, g) {
   const a0 = curAct(), a = a0 && a0.id === 'golf' && Voice.line('ACT', 'NONE') ? a0 : a0;
   if (a && (a.id !== 'golf' || Voice.line('ACT', 'NONE'))) {
     const base = Activities.brief(a, slot, date), fr = slot && ActFresh.get(a, slot, date);
     const text = fr ? base.split(' · ')[0] + ' · ' + fr : base;
-    return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
+    return { html: panel(`${a.name} // briefing`, a.tag, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} START · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>${pinBtn(a.id, slot)}` : ''}`, { key: 'uplink', i: 0 }), text };
   }
   const lines = Caddie.dayLines(g), gd = Activities.find('golf'), base0 = slot ? lines[slot.tee] : Caddie.banter(g);
   const fr = slot && gd && !/^Ah, such a beautiful morning!/.test(base0) ? ActFresh.get(gd, slot, date) : null, text = fr || base0;
   const freq = (121.5 + (Math.floor(T(date + 'T00:00') / DAY) % 37) * .25).toFixed(2);
-  return { html: panel('Fairway uplink // transmission', `FQ ${freq}`, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} SLOT · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>` : ''}`, { key: 'uplink', i: 0 }), text };
+  return { html: panel('Fairway uplink // transmission', `FQ ${freq}`, `<div class="uplink" id="uplink"></div>${slot ? `<div class="tiny" style="margin-top:8px">RE: ${hm(slot.tee)} SLOT · SCORE ${slot.score} · GRADE ${Golf.grade(slot.score)}</div>${pinBtn('golf', slot)}` : ''}`, { key: 'uplink', i: 0 }), text };
 }
 function typeUplink(el, text) {
   const op = Caddie.SAT, render = n => { const t = text.slice(0, n); const k = text.startsWith(op) ? Math.min(t.length, op.length) : 0;
@@ -660,6 +707,7 @@ function loadFromCache() {
   if (S.place) {
     const p = S.place;
     S.w = Obs.merge(Repo.forecast(p.lat, p.lon), Repo.obs(p.lat, p.lon));
+    try { Smart.Bias.record(S.w); } catch { }
     S.air = Repo.air(p.lat, p.lon);
     S.pollen = S.pollenKey ? Repo.pollen(p.lat, p.lon) : null;
   }
@@ -681,6 +729,7 @@ async function refresh(force = false) {
     await quiet(() => Repo.refreshForecast(COURSE.lat, COURSE.lon, 20 * MIN));
     if (OBS_ENABLED) await quiet(() => Repo.refreshObs(COURSE.lat, COURSE.lon, 10 * MIN));
     if (changed) { loadFromCache(); renderAll(); }
+    if (Date.now() - (smartTick.at || 0) > 15 * MIN) { smartTick.at = Date.now(); smartTick(); }
   } finally { busy = false; }
 }
 function setPlace(p) {
@@ -772,7 +821,7 @@ setInterval(() => {
 }, 30000);
 /* ---------- settings (mirror of Android ui/Settings.kt) ---------- */
 const TAB_LABELS = [['SCAN', '24H forecast'], ['TRAJ', '10-day outlook'], ['DATA', 'Telemetry'], ['ACT', 'Activities'], ['AIR', 'Air & pollen']];
-const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line']];
+const CORE_LABELS = [['quick', 'Quick stats'], ['loadout', 'Loadout'], ['comms', 'Comms bulletin'], ['bom', 'BoM station line'], ['analysis', 'Analysis (confidence, comfort, plan, commute)'], ['ask', 'Ask Skyfall']];
 let stQuery = '', stTab = 0;
 function themeCard(t) {
   const p = LIGHT ? t.light : t.dark, on = t.id === Prefs.theme, W = 140, H = 34, r = Math.min(t.radius * .6, 16), c = 9;
@@ -828,7 +877,15 @@ function renderSettings() {
       ${row('fx', 'briefingOn', 'Daily briefing', "A morning briefing in your personality's voice", Prefs.briefingOn)}
       <label class="st-time"><span>Briefing time</span><input type="time" id="stBriefAt" value="${Prefs.briefingAt}" ${Prefs.briefingOn ? '' : 'disabled'}></label>
       <button class="st-go" id="stBriefNow">Show today's briefing now</button></section>
-    <section class="st-card" data-st="2"><h3>Gemini key (optional)</h3><div class="sub">Your own free key from aistudio.google.com/app/apikey. It powers fresh daily loadout and activity lines in your personality's voice. Skyfall has no shared key: each person adds their own, and it stays only in their browser.</div>
+    <section class="st-card" data-st="3"><h3>Smart tips</h3><div class="sub">Best window this week for your activities, rain arriving in 15–30 minutes, your watched plan getting worse, and commute advice. On the web these need the page open (or installed) and notification permission.</div>
+      ${row('smart', 'smartOn', 'Smart tips', 'Worked out in your browser from the forecast', Store.get('smartOn', true))}</section>
+    <section class="st-card" data-st="3"><h3>Commute</h3><div class="sub">Where you work and when you travel. You get a heads-up before each leg, and the Analysis panel shows the next one.</div>
+      ${(() => { const c = Smart.Commutes.get(); return `<input class="st-key" id="cmWork" autocomplete="off" placeholder="Work suburb, e.g. Docklands" value="${esc(c ? c.name : '')}">
+      <div style="display:flex;gap:10px;margin-top:8px"><label class="st-time" style="flex:1"><span>Leave for work</span><input type="time" id="cmAm" value="${c ? String(Math.floor(c.am / 60)).padStart(2, '0') + ':' + String(c.am % 60).padStart(2, '0') : '08:00'}"></label>
+      <label class="st-time" style="flex:1"><span>Leave for home</span><input type="time" id="cmPm" value="${c ? String(Math.floor(c.pm / 60)).padStart(2, '0') + ':' + String(c.pm % 60).padStart(2, '0') : '17:30'}"></label></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="st-go" id="cmSave" style="flex:1">${c ? 'Update commute' : 'Save commute'}</button>${c ? '<button class="st-go" id="cmClear" style="flex:0 0 30%">Clear</button>' : ''}</div>
+      <div class="sub" id="cmMsg" style="font-size:11px;margin-top:6px">${c ? `Work: ${esc(c.name)}${c.region ? ', ' + esc(c.region) : ''}` : ''}</div>`; })()}</section>
+    <section class="st-card" data-st="2"><h3>Gemini key (optional)</h3><div class="sub">Your own free key from aistudio.google.com/app/apikey. It powers fresh daily loadout and activity lines in your personality's voice, and Ask Skyfall (Chrome with built-in AI can answer without a key). Skyfall has no shared key: each person adds their own, and it stays only in their browser.</div>
       <input class="st-key" id="kGemini" type="password" autocomplete="off" value="${esc(Store.get('kGemini', ''))}" placeholder="Paste your key"></section>
     <section class="st-card" data-st="4"><h3>Screens</h3><div class="sub">Choose which pages appear in the dock.</div>
       ${TAB_LABELS.map(([id, l]) => row('tabpref', id, l, id === 'ACT' && !Prefs.activities.length ? 'Add an activity first' : '', !Prefs.hiddenTabs.includes(id) && (id !== 'ACT' || Prefs.activities.length > 0))).join('')}</section>
@@ -838,7 +895,7 @@ function renderSettings() {
       ${row('fx', 'liveSky', 'Live sky behind CORE', 'The animated weather scene', Prefs.liveSky)}${row('fx', 'boot', 'Boot sequence', 'Terminal intro when the app opens', Prefs.boot)}</section>
     <section class="st-card" data-st="5"><h3>No accounts, no tracking</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Skyfall has no sign-in, no ads, no analytics, no cookies and no tracking of any kind. There is no Skyfall server: nothing about you is sent to us, because there is no “us” to send it to.</div></section>
     <section class="st-card" data-st="5"><h3>What stays in your browser</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your settings, activities, personality, last location, cached forecast and any keys you add live only in this browser's local storage. Clearing site data removes all of it.</div></section>
-    <section class="st-card" data-st="5"><h3>Who this page talks to</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your browser contacts these public services directly: Open-Meteo (forecast, air quality, place search; receives rounded coordinates or your search), BigDataCloud (names your location from rounded coordinates), Google Pollen only if you add a key (receives coordinates), and Google Gemini only if you add your own key (it receives your personality and the day's weather numbers, to write fresh lines). A strict security policy blocks this page from contacting anything else. Like any web request, each can see your IP address. Nothing else about you is sent.</div></section>
+    <section class="st-card" data-st="5"><h3>Who this page talks to</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Your browser contacts these public services directly: Open-Meteo (forecast, air quality, place search; receives rounded coordinates or your search), BigDataCloud (names your location from rounded coordinates), Google Pollen only if you add a key (receives coordinates), and Google Gemini only if you add your own key (it receives your personality, the day's weather numbers and any question you ask Skyfall). If your browser has built-in AI (Chrome's on-device Gemini Nano), Ask Skyfall uses that first and nothing leaves your device. Your comfort votes, habits, watched plan and commute stay in this browser. A strict security policy blocks this page from contacting anything else. Like any web request, each can see your IP address. Nothing else about you is sent.</div></section>
     <section class="st-card" data-st="5"><h3>Hosting</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The site is static files on GitHub Pages. GitHub, like any web host, may log visitors' IP addresses; Skyfall itself collects nothing.</div></section>
     <section class="st-card" data-st="5"><h3>Location</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">Location is only used in your browser to pick your forecast, and only if you allow it. You can always search for a place instead.</div></section>
     <section class="st-card" data-st="5"><h3>The Android app</h3><div class="sub" style="font-size:14px;line-height:1.5;color:var(--ink)">The app works the same way: everything is stored on the phone, alerts and briefings are worked out on the device, and it only contacts the public weather and news services, plus Google Gemini if you add your own key for fresh daily lines.</div></section>
@@ -867,6 +924,15 @@ $('#settings').addEventListener('click', e => {
   const cp = t.closest('[data-corepref]'); if (cp) { const id = cp.dataset.corepref; Prefs.hiddenCore = Prefs.hiddenCore.includes(id) ? Prefs.hiddenCore.filter(x => x !== id) : [...Prefs.hiddenCore, id]; return prefsChanged(); }
   const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; if ((fx.dataset.fx === 'alertsOn' || fx.dataset.fx === 'briefingOn') && Prefs[fx.dataset.fx]) askNotify(); return prefsChanged(); }
   const oc = t.closest('[data-occ]'); if (oc) { Occasions.preview = oc.dataset.occ; return prefsChanged(); }
+  const sm = t.closest('[data-smart]'); if (sm) { Store.set('smartOn', !Store.get('smartOn', true)); if (Store.get('smartOn', true)) askNotify(); return renderSettings(); }
+  if (t.closest('#cmClear')) { Smart.Commutes.set(null); workW = null; consFor = ''; renderSettings(); return renderCore(); }
+  if (t.closest('#cmSave')) { const q = $('#cmWork').value.trim(), msg = $('#cmMsg'); if (!q) { msg.textContent = 'Type a suburb or place first.'; return; }
+    const tm = id => { const [h, m] = ($(id).value || '00:00').split(':').map(Number); return h * 60 + m; };
+    msg.textContent = 'Finding it…';
+    OM.search(q).then(r => { const p = r[0]; if (!p) { msg.textContent = 'No place found by that name.'; return; }
+      Smart.Commutes.set({ name: p.name, region: p.region, lat: p.lat, lon: p.lon, am: tm('#cmAm'), pm: tm('#cmPm') }); consFor = ''; askNotify(); renderSettings(); renderCore(); })
+      .catch(e => { msg.textContent = "Couldn't search: " + e.message; });
+    return; }
   const ps = t.closest('[data-persona]'); if (ps) { Prefs.persona = ps.dataset.persona; typedSig.comms = ''; return prefsChanged(); }
   const tn = t.closest('[data-tone]'); if (tn) { const l = +tn.dataset.tone; playTone(l); askNotify(); pushNote(`${Alerts.name(l)} · TEST`, `This is a test of the Skyfall ${Alerts.name(l).toLowerCase()} alert.`, 'test' + l); return; }
   if (t.closest('#stBriefNow')) { Store.set('briefFolded', ''); closeSettings(); goTab(0); renderCore(); const b = S.w && Briefing.text(S.w, S.place ? S.place.name : 'your sector'); if (b) pushNote(b.title, b.body, 'briefing'); return; }
@@ -892,7 +958,7 @@ document.body.addEventListener('click', e => {
   const day = t.closest('[data-day]');
   if (day) { const which = day.closest('[data-chips]').dataset.chips; if (which === 'core') { S.coreDay = day.dataset.day; renderCore(); } else { S.golfDay = day.dataset.day; S.golfSlot = null; renderGolf(); } return; }
   const go = t.closest('[data-go]'); if (go) { const k = go.dataset.go; if (k === 'GOLF') S.actId = Prefs.activities[0]; const gi = TABS.findIndex(x => x[1] === k); if (gi >= 0) { if (k === 'GOLF') { renderGolf(); renderDock(); } goTab(gi); } return; }
-  const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; renderGolf(); renderDock(); renderTop(); updateSceneKind(); return; }
+  const as = t.closest('[data-act]'); if (as) { S.actId = as.dataset.act; Smart.Habits.record(S.actId); renderGolf(); renderDock(); renderTop(); updateSceneKind(); return; }
   const tee = t.closest('[data-tee]'); if (tee) { S.golfSlot = +tee.dataset.tee; renderGolf(); return; }
   const gt = t.closest('[data-gtab]'); if (gt) { S.golfTab = gt.dataset.gtab; renderGolf(); return; }
   const hd = t.closest('[data-hand]'); if (hd) { S.hand = hd.dataset.hand; Store.set('hand', S.hand); renderGolf(); return; }

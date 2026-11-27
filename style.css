@@ -401,3 +401,18 @@ body[data-shape=round] .ph i,body[data-shape=outline] .ph i{border-radius:50%}
 .irow .im{font:9px var(--fl),monospace;letter-spacing:1.5px;color:var(--faint);margin-top:2px}.irow .is{font-size:13px;line-height:1.4;color:var(--dim);margin-top:6px}
 .irow .io{display:inline-block;font:10px var(--fl),monospace;letter-spacing:1.5px;color:var(--ac);margin-top:6px}
 .st-key{width:100%;box-sizing:border-box;background:rgba(var(--inkrgb),.06);border:0;border-radius:10px;padding:10px 12px;color:var(--ink);font-size:14px;margin-top:4px}
+
+/* Analysis + Ask Skyfall */
+.an-lbl{font:calc(9px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;color:var(--ac);margin-bottom:4px}
+.an-row{display:flex;gap:10px;font:calc(10px * var(--ls)) var(--fl),monospace;letter-spacing:.5px;padding:2px 0}
+.an-line{font-size:calc(13px * var(--ls));line-height:1.4;color:var(--ink)}
+.an-line.dim{color:var(--dim)}
+.an-sub{font-size:calc(11px * var(--ls));color:var(--faint);margin-top:4px;line-height:1.4}
+.an-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.an-btns button{border:1px solid color-mix(in srgb,var(--ac) 80%,transparent);color:var(--ac);padding:7px 10px;font-size:calc(13px * var(--ls));background:none}
+.an-btns button:disabled{opacity:.35}
+.an-link{display:block;margin-top:8px;background:none;border:0;padding:0;color:var(--ac);font:calc(9px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;text-align:left;cursor:pointer}
+.ask{display:flex;gap:10px;align-items:center;background:rgba(var(--inkrgb),.06);padding:8px 12px}
+.ask input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font-size:calc(14px * var(--ls))}
+.ask button{background:none;border:0;color:var(--ac);font:calc(11px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;cursor:pointer}
+.ask-a{margin-top:10px;font-size:calc(15px * var(--ls));line-height:1.45;color:var(--ink)}
