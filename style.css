@@ -425,3 +425,4 @@ body[data-shape=round] .ph i,body[data-shape=outline] .ph i{border-radius:50%}
 .ask button{background:none;border:0;color:var(--ac);font:calc(11px * var(--ls)) var(--fl),monospace;letter-spacing:1.5px;cursor:pointer}
 .ask-a{margin-top:10px;font-size:calc(15px * var(--ls));line-height:1.45;color:var(--ink)}
 .ask .ask-x{color:var(--faint);font-size:calc(13px * var(--ls));padding:0 2px}
+#briefCard .b p{margin:0 0 .8em;line-height:1.5}#briefCard .b p:last-child{margin-bottom:0}

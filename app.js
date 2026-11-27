@@ -850,10 +850,20 @@ function renderAlerts() {
 $('#alerts').addEventListener('click', () => { alOpen = !alOpen; renderAlerts(); });
 const todayKey = () => S.w ? dkey(S.w.current.time) : '';
 const briefDue = () => { if (!Prefs.briefingOn || !S.w) return false; const n = new Date(localNow(S.w.off)), [h, m] = Prefs.briefingAt.split(':').map(Number); return n.getUTCHours() * 60 + n.getUTCMinutes() >= h * 60 + m; };
+/** Long text as short paragraphs (two sentences each), like Android's Paras. */
+function paras(t, per = 2) {
+  const out = [];
+  String(t).split(/\n\s*\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean).forEach(blk => {
+    const s = blk.split(/(?<=[.!?…])\s+(?=[A-Z0-9"'‘“(])/).filter(Boolean);
+    if (s.length <= per + 1) out.push(blk); else for (let i = 0; i < s.length; i += per) out.push(s.slice(i, i + per).join(' '));
+  });
+  return out.map(x => `<p>${esc(x)}</p>`).join('');
+}
 function briefCard() {
   if (!S.w || !Prefs.briefingOn) return '';
-  const b = Briefing.text(S.w, S.place ? S.place.name : 'your sector');
-  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${esc(b.body)}</div></div>`;
+  const city = S.place ? S.place.name : 'your sector', b = Briefing.text(S.w, city);
+  let ai = null; try { ai = BriefFresh.get(S.w, city); } catch { }
+  return `<div class="brief" id="briefCard"><div class="t"><span>${esc(b.title.toUpperCase())}</span></div><div class="b">${paras(ai || b.body)}</div></div>`;
 }
 setInterval(() => {
   if (document.hidden || !S.w || !briefDue() || Store.get('briefPushed', '') === todayKey()) return;

@@ -183,3 +183,23 @@ const ActFresh = {
     return null;
   },
 };
+
+/* Freshly written daily briefing (Android Voicebox.briefing): browser AI first, then your Gemini key. */
+const BriefFresh = {
+  busy: false,
+  get(w, city) {
+    const date = new Date(w.current.time).toISOString().slice(0, 10);
+    const angles = ["a starship captain's log", 'a nature documentary', 'a film-noir monologue', 'a breaking-news bulletin', 'a heist briefing', 'a sports pre-game show', 'a mission control go/no-go poll', 'a weary tour guide', 'a royal proclamation', 'a late-night radio host', 'a war-room situation report', 'a cooking show', 'a museum audio guide', "a weather god's performance review"];
+    const angle = angles[Math.abs(Math.floor(T(date + 'T00:00') / DAY) * 5) % angles.length];
+    const facts = Briefing.aiFacts(w, city), k = 'brief_' + SkyPrefs.persona + '_' + date + '_' + [...(angle + facts)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
+    const c = Store.get(k, null); if (c) return c;
+    const day = Store.get('briefDay_' + SkyPrefs.persona + '_' + date, null);
+    if (this.busy || (!VoiceKeys.gemini && !self.LanguageModel)) return day;
+    this.busy = true;
+    const recent = (Store.get('recentBrief', []) || []).slice(-4);
+    const sys = `You write the morning briefing on the Skyfall weather console.\n${Voicebox.style()}\nRules: 55 to 95 words, natural British English, in the persona's voice and humour. Open with a fresh greeting (not 'Good morning, city'), then the 2-3 things that actually matter today with their times and numbers, then one practical call (what to wear, when to go out). Frame it like ${angle}, still in the persona's voice. Aim the humour at the weather, never at the reader. Use ONLY the facts given; never invent times, numbers or events. Plain text, no emojis, no markdown, no lists.` + (recent.length ? `\nDon't reuse jokes, openings or phrasing from these recent briefings:\n- ${recent.join('\n- ')}` : '');
+    Smart.ask(sys, facts).then(x => { const v = x.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim(); if (v.length > 40) { Store.set(k, v); Store.set('briefDay_' + SkyPrefs.persona + '_' + date, v); Store.set('recentBrief', [...recent, v.slice(0, 220)].slice(-5)); window.dispatchEvent(new Event('skyfall:refresh')); } })
+      .catch(() => { }).finally(() => { this.busy = false; });
+    return day;
+  },
+};

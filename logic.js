@@ -731,22 +731,58 @@ const Occasions = {
   },
 };
 
-/* ---------- daily briefing (Android notify/Briefing.text) ---------- */
+/* ---------- daily briefing (Android notify/Briefing.kt) ---------- */
 const Briefing = {
+  /** Today's notable facts, most important first; each has a few phrasings, so the briefing reads differently daily. */
+  facts(w) {
+    const c = w.current, now = c.time, d = today(w); if (!d) return [];
+    const from = now - (now % HOUR), day = w.hourly.filter(h => dkey(h.time) === dkey(now) && h.time >= from);
+    const seed = Math.floor(T(dkey(now) + 'T00:00') / DAY), pick = (...o) => o[fmod(seed + o.length * 7, o.length)], out = [];
+    const wet = day.filter(h => (h.pop || 0) >= 40 || h.precip >= 0.3);
+    if (wet.length) {
+      const fromT = wet[0].time, to = wet[wet.length - 1].time + HOUR, peak = Math.max(...wet.map(h => h.pop || 0)), mm = day.reduce((s, h) => s + (h.precip || 0), 0).toFixed(1);
+      out.push([90, fromT === day[0].time ? pick(`Wet from the off: rain chance up to ${peak}% until about ${hm(to)}, ${mm} mm in all.`, `It's already in play: ${peak}% rain chance through to ${hm(to)}, about ${mm} mm.`)
+        : pick(`Dry until about ${hm(fromT)}, then ${peak}% rain through to ${hm(to)} (${mm} mm).`, `You've got until ${hm(fromT)} before the rain (${peak}%, ${mm} mm) moves in.`, `Rain window: ${hm(fromT)}–${hm(to)}, up to ${peak}%. Anything outdoors goes before ${hm(fromT)}.`)]);
+      if (day.some(h => h.code >= 95 && h.code <= 99)) out.push([95, pick('Thunderstorms possible today. Indoors when it rumbles.', 'Storm cells about today: lightning beats any plan.')]);
+    } else out.push([30, pick('No rain worth the name today.', 'Dry all day: under 40% everywhere.', 'Rain chance stays low all day.')]);
+    const g = day.reduce((a, h) => !a || h.gust > a.gust ? h : a, null);
+    if (g && g.gust >= 40) out.push([g.gust >= 60 ? 85 : 60, pick(`Gusts peak near ${R(g.gust)} km/h around ${hm(g.time)}.`, `Wind builds to ${R(g.gust)} km/h gusts by ${hm(g.time)}. Hats are a gamble.`)]);
+    const tmax = R(d.max), tmin = R(d.min), warm = day.reduce((a, h) => !a || h.temperature > a.temperature ? h : a, null);
+    if (tmax - tmin >= 10) out.push([55, pick(`Big swing: ${tmin}° to ${tmax}°. Layers you can shed.`, `${tmin}° at the cold end, ${tmax}° at the top. Dress for both.`)]);
+    if (warm) out.push([40, pick(`Warmest around ${hm(warm.time)} at ${R(warm.temperature)}°.`, `It peaks near ${R(warm.temperature)}° about ${hm(warm.time)}.`)]);
+    if (Math.abs(c.feelsLike - c.temperature) >= 3) out.push([50, `Feels like ${R(c.feelsLike)}° right now, not ${R(c.temperature)}°.`]);
+    const uvH = day.filter(h => (h.uv || 0) >= 8);
+    if (uvH.length) out.push([65, pick(`UV ${R(d.uvMax || 8)}+ from ${hm(uvH[0].time)} to ${hm(uvH[uvH.length - 1].time + HOUR)}. Sunscreen before you leave, not after.`, `Burn window ${hm(uvH[0].time)}–${hm(uvH[uvH.length - 1].time + HOUR)} (UV ${R(d.uvMax || 8)}).`)]);
+    const t = w.daily[1];
+    if (t) { const dd = t.max - d.max;
+      if (dd <= -6) out.push([45, `Tomorrow drops to ${R(t.max)}°, ${R(-dd)}° cooler. Enjoy today.`]);
+      else if (dd >= 6) out.push([45, `Tomorrow jumps to ${R(t.max)}°, ${R(dd)}° warmer.`]);
+      else if ((t.popMax || 0) >= 60 && !wet.length) out.push([45, `Tomorrow turns wet (${t.popMax}%). Today's the dry one.`]); }
+    const wd = dow(now);
+    if (wd === 4 || wd === 5) { const wk = w.daily.filter(x => [6, 0].includes(dow(T(x.date + 'T00:00')))).slice(0, 2);
+      if (wk.length === 2) out.push([35, `Weekend: Sat ${R(wk[0].min)}–${R(wk[0].max)}° (${wk[0].popMax || 0}% rain), Sun ${R(wk[1].min)}–${R(wk[1].max)}° (${wk[1].popMax || 0}%).`]); }
+    try { const a = Activities.find((SkyPrefs.activities || [])[0]), b = a && Activities.day(w, dkey(now), a).best;
+      if (b) out.push([58, `Best ${a.name.toLowerCase()} window: ${hm(b.tee)}, scoring ${b.score}` + (b.limiter !== 'NONE' ? ` (${b.limiter.toLowerCase()} is the catch).` : '.')]); } catch { }
+    if ((d.code || 0) <= 3) out.push([20, pick(`Sunset ${hm(d.sunset)}.`, `Light until ${hm(d.sunset)}.`)]);
+    return out.sort((x, y) => y[0] - x[0]).map(x => x[1]);
+  },
+  /** Built-in version in the active personality (the AI-written one replaces it when available). */
   text(w, city) {
     const p = Voice.persona(), c = w.current, d = today(w), seed = Math.floor(T(dkey(c.time) + 'T00:00') / DAY);
-    const from = c.time - (c.time % HOUR), hours = w.hourly.filter(h => h.time >= from).slice(0, 16);
-    const pop = Math.max(0, ...hours.map(h => h.pop || 0)), wet = hours.find(h => (h.pop || 0) >= 40);
-    const tmax = R(d ? d.max : c.temperature), tmin = R(d ? d.min : c.temperature), uv = R((d && d.uvMax) || 0);
-    const dt = new Date(c.time), date = `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.getUTCDay()]}, ${dt.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
-    const vars = { city, date, temp: R(c.temperature), tmax, tmin, pop, time: wet ? hm(wet.time) : 'later', uv };
+    const tmax = R(d ? d.max : c.temperature), tmin = R(d ? d.min : c.temperature);
+    const dt = new Date(c.time), date = `${DOWL[dt.getUTCDay()]} ${dt.getUTCDate()} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][dt.getUTCMonth()]}`;
+    const vars = { city, date, temp: R(c.temperature), tmax, tmin };
     const l = (k, f) => Voice.fill(Voice.line('BRIEF', k, seed) || f, vars);
-    const stormy = hours.some(h => h.code >= 95 && h.code <= 99);
-    const cond = pop >= 40 || stormy ? l('WET', 'Rain {pop}% from {time}.') : tmax >= 30 ? l('HOT', 'Peak {tmax}°.') : tmin <= 6 ? l('COLD', 'Low of {tmin}°.') : l('NICE', 'Pleasant day.');
     const hr = new Date(localNow(w.off)).getUTCHours(), period = hr >= 5 && hr <= 11 ? 'MORNING' : hr <= 16 && hr >= 12 ? 'AFTERNOON' : hr >= 17 && hr <= 20 ? 'EVENING' : 'NIGHT';
     const occ = Occasions.today(dkey(c.time)).map(o => Occasions.line(o, seed)).filter(Boolean).join(' ');
-    const body = `${l('HELLO_' + period, 'Hello.')}${occ ? ' ' + occ : ''} ${date} — ${city}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()} now, ${tmin}–${tmax}° today, ${pop}% chance of rain, UV ${uv}. ${cond} ${l('BYE', 'Skyfall out.')}`;
+    const kicks = (p && p.lines && p.lines.KICK && p.lines.KICK.ANY) || [], kick = kicks.length ? kicks[fmod(seed * 7 + hr, kicks.length)] : '';
+    const body = `${l('HELLO_' + period, 'Hello.')}${occ ? ' ' + occ : ''} ${city}, ${date}: ${R(c.temperature)}° and ${Codes.label(c.code).toLowerCase()}, heading for ${tmin}–${tmax}°. ${this.facts(w).slice(0, 3).join(' ')} ${kick} ${l('BYE', 'Skyfall out.')}`.replace(/\s+/g, ' ').trim();
     return { title: `${p.name} // Daily briefing`, body };
+  },
+  aiFacts(w, city) {
+    const c = w.current, t = today(w), dt = new Date(c.time);
+    return `City: ${city}. Now ${DOWL[dt.getUTCDay()]} ${dt.getUTCDate()} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][dt.getUTCMonth()]} ${hm(c.time)}: ${R(c.temperature)}C (feels ${R(c.feelsLike)}C), ${Codes.label(c.code)}. Today ${R(t ? t.min : c.temperature)}-${R(t ? t.max : c.temperature)}C, rain chance up to ${(t && t.popMax) || 0}%, UV ${R((t && t.uvMax) || 0)}. Highlights: ${this.facts(w).slice(0, 5).join(' ')}` +
+      Occasions.today(dkey(c.time)).map(o => ` Today is ${o.name}.`).join('');
   },
 };
 
