@@ -257,7 +257,7 @@ function analysisPanel(w) {
   return panel('Analysis // in your browser', 'AI-04', body, { key: 'analysis', i: 3 });
 }
 function askPanel() {
-  return panel('Ask Skyfall', 'Q-01', `<form class="ask" id="askForm"><input id="askQ" autocomplete="off" placeholder="Can I sail Sunday afternoon?" value="${esc(askQ)}"><button ${askBusy ? 'disabled' : ''}>${askBusy ? '…' : 'ASK ›'}</button></form>${askA ? `<div class="ask-a">${esc(askA)}</div>` : ''}`, { key: 'ask', i: 4 });
+  return panel('Ask Skyfall', 'Q-01', `<form class="ask" id="askForm"><input id="askQ" autocomplete="off" placeholder="Can I sail Sunday afternoon?" value="${esc(askQ)}">${askQ || askA ? '<button type="button" class="ask-x" data-askclear aria-label="Clear">✕</button>' : ''}<button ${askBusy ? 'disabled' : ''}>${askBusy ? '…' : 'ASK ›'}</button></form>${askA ? `<div class="ask-a">${esc(askA)}</div>` : ''}`, { key: 'ask', i: 4 });
 }
 async function runAsk(q) {
   if (!q.trim() || askBusy || !S.w) return; askQ = q; askBusy = true; askA = ''; renderCore();
@@ -267,8 +267,11 @@ async function runAsk(q) {
   try { askA = await Smart.ask(sys, `Forecast data:\n${data}\n\nQuestion: ${q.trim()}`); } catch (e) { askA = String(e.message || e).slice(0, 220); }
   askBusy = false; renderCore();
 }
-document.addEventListener('submit', e => { if (e.target.id === 'askForm') { e.preventDefault(); runAsk($('#askQ').value); } });
+document.addEventListener('submit', e => { if (e.target.id === 'askForm') { e.preventDefault(); $('#askQ').blur(); runAsk($('#askQ').value); } });
+document.addEventListener('input', e => { if (e.target.id === 'askQ') askQ = e.target.value; });
+document.addEventListener('focusin', e => { if (e.target.id === 'askQ') setTimeout(() => e.target.closest('section').scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); });
 document.addEventListener('click', e => {
+  if (e.target.closest('[data-askclear]')) { askQ = ''; askA = ''; renderCore(); return; }
   const f = e.target.closest('[data-feel]'); if (f) { Smart.Comfort.vote(+f.dataset.feel); renderCore(); return; }
   if (e.target.closest('[data-unplan]')) { Smart.Plans.clear(); renderCore(); renderGolf(); return; }
   const pl = e.target.closest('[data-pin]'); if (pl) { const a = curAct(), g = a && Activities.day(golfSource() && a.id === 'golf' ? golfSource() : S.w, S.golfDay, a), t = g && ([customWindow(golfSource() && a.id === 'golf' ? golfSource() : S.w, a, a.id === 'golf')].find(x => x && x.tee === +pl.dataset.pin) || g.windows.find(x => x.tee === +pl.dataset.pin));
