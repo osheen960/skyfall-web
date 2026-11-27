@@ -12,7 +12,7 @@ const Voicebox = {
   async hash(s) { const b = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s)); return [...new Uint8Array(b)].slice(0, 10).map(x => x.toString(16).padStart(2, '0')).join(''); },
   /* Ask the API which models this key can use (names change often), best Flash first. Cached a day. */
   async models(key) {
-    const c = Store.get('gModels', null); if (c && c.k === key.slice(-6) && Date.now() - c.at < 86400000) return c.list;
+    const c = Store.get('gModels2', null); if (c && c.k === key.slice(-6) && Date.now() - c.at < 86400000) return c.list;
     let list = [];
     try {
       const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': key } }), j = await r.json();
@@ -20,11 +20,11 @@ const Voicebox = {
       list = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => m.name.replace(/^models\//, ''))
         .filter(n => /^gemini-/.test(n) && !/(tts|image|live|audio|embed|vision|thinking|robotics|computer|exp)/.test(n));
       const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
-      const score = n => ver(n) * 100 + (/flash/.test(n) ? 20 : 0) - (/lite/.test(n) ? 8 : 0) - (/preview/.test(n) ? 3 : 0) + (/latest/.test(n) ? 1 : 0) - (/pro/.test(n) ? 30 : 0);
+      const score = n => n === 'gemini-flash-latest' ? 1e5 : n === 'gemini-flash-lite-latest' ? 9.9e4 : ver(n) * 100 + (/flash/.test(n) ? 20 : 0) - (/lite/.test(n) ? 8 : 0) - (/preview/.test(n) ? 60 : 0) - (/pro/.test(n) ? 80 : 0);
       list.sort((a, b) => score(b) - score(a));
     } catch (e) { if (/API key|PERMISSION|UNAUTH/i.test(e.message)) throw e; }
     if (!list.length) list = this.MODELS;
-    Store.set('gModels', { k: key.slice(-6), at: Date.now(), list }); return list;
+    Store.set('gModels2', { k: key.slice(-6), at: Date.now(), list }); return list;
   },
   async gemini(system, prompt, { search = false, temp = 0.9 } = {}) {
     const key = VoiceKeys.gemini; if (!key) throw new Error('No Gemini key');
@@ -32,23 +32,28 @@ const Voicebox = {
     if (search) body.tools = [{ google_search: {} }];
     const pref = Store.get('gModel', null), avail = await this.models(key); let first;
     let busy = 0;
-    for (const m of [pref, ...avail.filter(x => x !== pref)].filter(Boolean).slice(0, 6)) {
+    const skipped = m => Date.now() - (Store.get('skip_' + m, 0) || 0) < 3600000;
+    let cands = [pref, ...avail.filter(x => x !== pref)].filter(Boolean); if (cands.some(m => !skipped(m))) cands = cands.filter(m => !skipped(m));
+    let quota = null;
+    for (const m of cands.slice(0, 6)) {
       try {
         let r, j, wait = 1500;
         for (let a = 0; a < 3; a++) {   // short backoff on Google's "busy" answers
           r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
           j = await r.json();
-          if (![429, 500, 503].includes(r.status) || a === 2) break;
+          if (![500, 503].includes(r.status) || a === 2) break;
           await new Promise(res => setTimeout(res, wait)); wait *= 2;
         }
-        if ([429, 500, 503].includes(r.status)) busy++;
+        if ([500, 503].includes(r.status)) busy++;
+        if (r.status === 429) { quota = quota || (j.error?.message || 'quota'); Store.set('skip_' + m, Date.now()); }
         if (!r.ok) { const er = new Error(`${m}: ${j.error?.message || 'HTTP ' + r.status}`); first = first || er; if (r.status === 401 || r.status === 403 || /API key/.test(er.message)) throw er; if (pref === m) Store.del('gModel'); continue; }
         const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
         if (!text.trim()) continue;
         Store.set('gModel', m); return text;
       } catch (e) { first = first || e; if (/API key|PERMISSION/.test(e.message)) throw e; }
     }
-    if (search && !busy) return this.gemini(system, prompt, { search: false, temp });   // some models/tiers lack Search grounding
+    if (search && !busy && !quota) return this.gemini(system, prompt, { search: false, temp });
+    if (quota) throw new Error('Gemini free limit used up for now. Google says: ' + String(quota).slice(0, 140));   // some models/tiers lack Search grounding
     if (busy) throw new Error("Google's AI is overloaded right now. Try again in a minute.");
     throw first || new Error('No script');
   },
