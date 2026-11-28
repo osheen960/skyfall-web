@@ -533,9 +533,9 @@ const Festive = (() => {
     stroke(rgba(H2('#0A0E16'), 0.5 * vis), 0.6); c.beginPath(); c.moveTo(x + 30, y - 6); c.lineTo(x + 106, y - 6); c.stroke();
   }
   function flurry() {
-    const a0 = (1 - e.snow * 0.7) * (1 - e.rain * 0.5); if (a0 < 0.05) return;
+    if (e.rain > 0.03 || e.snow > 0.03 || e.storm > 0.03) return; const a0 = 0.55 * (1 - e.fog * 0.6);
     const wx = e.windX * Math.min(e.windKmh, 40) / 40, Hh = e.H + 20, FL = H2('#F4F8FF'), GL = H2('#E6F0FF');
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 45; i++) {
       const z = 0.4 + rnd(i + 500) * 0.6, sp = 18 + 34 * z, y = ((rnd(i + 600) * Hh + e.t * sp) % Hh) - 10;
       const sway = Math.sin(e.t * (0.6 + rnd(i + 700)) + i) * 10 * z, x = (((rnd(i + 800) * e.W + sway + e.t * wx * 20 * z) % e.W) + e.W) % e.W, r = 0.9 + 1.9 * z;
       c.fillStyle = rgba(FL, (0.45 + 0.5 * z) * a0); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
@@ -543,7 +543,7 @@ const Festive = (() => {
     }
   }
   function santa() {
-    const period = 30, ph = (e.t % period) / period; if (ph > 0.6) return;
+    if (e.storm > 0.3 || e.rain > 0.5) return; const period = 30, ph = (e.t % period) / period; if (ph > 0.6) return;
     const sc = Math.max(1.1, Math.min(1.9, Math.min(e.W, e.H) / 320)), span = e.W + 260 * sc, x = -170 * sc + span * (ph / 0.6), y = e.H * 0.16 + Math.sin(e.t * 0.9) * 7 * sc;
     const night = e.dark, NV = H2('#0A0E16'), sh = h => rgba(lerp(H2(h), NV, night * 0.3));
     const red = sh('#D42A2A'), white = sh('#F4F4F4'), gold = sh('#FFC83D'), brown = sh('#7A4A2A'), dark = sh('#2A1A10'), skin = sh('#F0C8A0'), antler = sh('#C9A26A');
