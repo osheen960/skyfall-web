@@ -1050,7 +1050,48 @@ async function boot() {
   setTimeout(halfHour, nextHalf());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
+  setTimeout(() => Updater.start(), 0);   // after the whole script has loaded
 }
+
+/* Force-refresh on deploy: every push bumps version.json; open tabs notice within a couple of minutes
+   (or as soon as you come back to the tab), drop the old cache and reload themselves. */
+const Updater = {
+  mine: +(document.querySelector('meta[name="skyfall-build"]') || {}).content || 0,
+  pending: false,
+  async check() {
+    if (!this.mine || location.protocol === 'file:') return;
+    try {
+      const r = await fetch('version.json?ts=' + Date.now(), { cache: 'no-store' });
+      const v = (await r.json()).build;
+      if (v && v > this.mine) {
+        // One reload per new build: if the page still comes back old (a stale cache upstream), don't loop.
+        if (sessionStorage.getItem('sf:reloadedFor') === String(v)) return;
+        sessionStorage.setItem('sf:reloadedFor', String(v));
+        this.pending = true; this.apply();
+      }
+    } catch { }
+  },
+  async apply() {
+    // Don't yank the page out from under someone typing; wait until they leave the field.
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && !document.hidden) { a.addEventListener('blur', () => this.apply(), { once: true }); return; }
+    if (this.reloading) return; this.reloading = true;
+    try { toast('Updating Skyfall…'); } catch { }
+    try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch { }
+    try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch { }
+    setTimeout(() => location.reload(), 400);
+  },
+  start() {
+    this.check();
+    setInterval(() => { if (!document.hidden) this.check(); }, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
+    window.addEventListener('focus', () => this.check());
+    // A new service worker taking over also means new files: reload once onto them.
+    let swapped = false;
+    navigator.serviceWorker?.addEventListener('controllerchange', () => { if (swapped) return; swapped = true; if (this.pending) return; this.check(); });
+  },
+};
+window.SkyUpdater = Updater;
 document.addEventListener('input', e => {
   if (e.target.id !== 'stText') return;
   Prefs.textScale = +e.target.value; savePrefs(); setPalette();
