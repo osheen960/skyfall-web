@@ -532,6 +532,48 @@ const Festive = (() => {
       if (k === 3) glow(rx + 10, ry - 7, 8, GOLD, 0.7 * vis); }
     stroke(rgba(H2('#0A0E16'), 0.5 * vis), 0.6); c.beginPath(); c.moveTo(x + 30, y - 6); c.lineTo(x + 106, y - 6); c.stroke();
   }
+  function flurry() {
+    const a0 = (1 - e.snow * 0.7) * (1 - e.rain * 0.5); if (a0 < 0.05) return;
+    const wx = e.windX * Math.min(e.windKmh, 40) / 40, Hh = e.H + 20, FL = H2('#F4F8FF'), GL = H2('#E6F0FF');
+    for (let i = 0; i < 90; i++) {
+      const z = 0.4 + rnd(i + 500) * 0.6, sp = 18 + 34 * z, y = ((rnd(i + 600) * Hh + e.t * sp) % Hh) - 10;
+      const sway = Math.sin(e.t * (0.6 + rnd(i + 700)) + i) * 10 * z, x = (((rnd(i + 800) * e.W + sway + e.t * wx * 20 * z) % e.W) + e.W) % e.W, r = 0.9 + 1.9 * z;
+      c.fillStyle = rgba(FL, (0.45 + 0.5 * z) * a0); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+      if (z > 0.85) glow(x, y, r * 3.5, GL, 0.25 * a0);
+    }
+  }
+  function santa() {
+    const period = 30, ph = (e.t % period) / period; if (ph > 0.6) return;
+    const sc = Math.max(1.1, Math.min(1.9, Math.min(e.W, e.H) / 320)), span = e.W + 260 * sc, x = -170 * sc + span * (ph / 0.6), y = e.H * 0.16 + Math.sin(e.t * 0.9) * 7 * sc;
+    const night = e.dark, NV = H2('#0A0E16'), sh = h => rgba(lerp(H2(h), NV, night * 0.3));
+    const red = sh('#D42A2A'), white = sh('#F4F4F4'), gold = sh('#FFC83D'), brown = sh('#7A4A2A'), dark = sh('#2A1A10'), skin = sh('#F0C8A0'), antler = sh('#C9A26A');
+    const L = (x0, y0, x1, y1) => { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+    const R = (x0, y0, x1, y1) => c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    const dot = (x0, y0, r) => { c.beginPath(); c.arc(x0, y0, r, 0, 7); c.fill(); };
+    for (let k = 0; k < 14; k++) { const tx = x - 6 * sc - k * 9 * sc, ty = y + 2 * sc + Math.sin(e.t * 3 + k) * 3 * sc, a = (1 - k / 14) * (0.35 + 0.5 * night);
+      glow(tx, ty, 5 * sc, GOLD, a * 0.6); c.fillStyle = rgba(H2('#FFF4C8'), a); dot(tx, ty, 1.1 * sc); }
+    stroke(gold, 0.9 * sc); L(x + 30 * sc, y - 8 * sc, x + 120 * sc, y - 9 * sc);
+    for (let k = 0; k < 4; k++) { const rx = x + 50 * sc + k * 22 * sc, ry = y - 8 * sc + Math.sin(e.t * 6 + k) * 2.2 * sc, leg = Math.sin(e.t * 9 + k) * 3 * sc;
+      stroke(dark, 1.6 * sc); L(rx - 5 * sc, ry + 2 * sc, rx - 8 * sc - leg, ry + 9 * sc); L(rx + 5 * sc, ry + 2 * sc, rx + 8 * sc + leg, ry + 9 * sc);
+      c.fillStyle = brown; oval(rx - 8 * sc, ry - 3.5 * sc, rx + 8 * sc, ry + 3.5 * sc); stroke(brown, 2.4 * sc); L(rx + 6 * sc, ry - sc, rx + 9 * sc, ry - 7 * sc); dot(rx + 10 * sc, ry - 8 * sc, 2.6 * sc);
+      stroke(antler, sc); L(rx + 9 * sc, ry - 10 * sc, rx + 7 * sc, ry - 15 * sc); L(rx + 7 * sc, ry - 13 * sc, rx + 4.5 * sc, ry - 14.5 * sc); L(rx + 11 * sc, ry - 10 * sc, rx + 13 * sc, ry - 15 * sc); L(rx + 12.5 * sc, ry - 13 * sc, rx + 15 * sc, ry - 14 * sc);
+      c.fillStyle = gold; dot(rx, ry - 3.5 * sc, 1.2 * sc);
+      if (k === 3) glow(rx + 12.5 * sc, ry - 7.5 * sc, 9 * sc, GOLD, 0.35 + 0.55 * night); }
+    c.fillStyle = brown; dot(x + 5 * sc, y - 12 * sc, 8 * sc); c.fillStyle = sh('#2FA84F'); R(x - sc, y - 22 * sc, x + 6 * sc, y - 15 * sc); c.fillStyle = gold; R(x + 2 * sc, y - 22 * sc, x + 3.2 * sc, y - 15 * sc);
+    c.fillStyle = red; c.beginPath(); c.moveTo(x - 4 * sc, y - 10 * sc); c.lineTo(x + 30 * sc, y - 10 * sc); c.quadraticCurveTo(x + 36 * sc, y - 10 * sc, x + 36 * sc, y - 18 * sc);
+    c.lineTo(x + 39 * sc, y - 18 * sc); c.quadraticCurveTo(x + 39 * sc, y + sc, x + 26 * sc, y + sc); c.lineTo(x + 2 * sc, y + sc); c.quadraticCurveTo(x - 6 * sc, y + sc, x - 4 * sc, y - 10 * sc); c.closePath(); c.fill();
+    c.fillStyle = gold; R(x - 2 * sc, y - 4.5 * sc, x + 34 * sc, y - 3 * sc);
+    stroke(gold, 1.5 * sc); L(x - 4 * sc, y + 6 * sc, x + 38 * sc, y + 6 * sc); L(x + 4 * sc, y + sc, x + 4 * sc, y + 6 * sc); L(x + 28 * sc, y + sc, x + 28 * sc, y + 6 * sc);
+    c.beginPath(); c.arc(x + 38 * sc, y + 3 * sc, 3 * sc, -Math.PI / 2, Math.PI / 2); c.stroke();
+    c.fillStyle = red; c.beginPath(); c.roundRect ? c.roundRect(x + 13 * sc, y - 22 * sc, 14 * sc, 13 * sc, 5 * sc) : c.rect(x + 13 * sc, y - 22 * sc, 14 * sc, 13 * sc); c.fill();
+    c.fillStyle = white; R(x + 13 * sc, y - 12 * sc, x + 27 * sc, y - 10 * sc);
+    c.fillStyle = skin; dot(x + 22 * sc, y - 26 * sc, 4.2 * sc);
+    c.fillStyle = white; c.beginPath(); c.moveTo(x + 18 * sc, y - 26 * sc); c.quadraticCurveTo(x + 22 * sc, y - 15 * sc, x + 27 * sc, y - 25 * sc); c.closePath(); c.fill();
+    c.fillStyle = red; c.beginPath(); c.moveTo(x + 17.5 * sc, y - 28 * sc); c.lineTo(x + 26.5 * sc, y - 28 * sc); c.lineTo(x + 14 * sc, y - 36 * sc); c.closePath(); c.fill();
+    c.fillStyle = white; R(x + 17 * sc, y - 29.5 * sc, x + 27 * sc, y - 27.5 * sc); dot(x + 14 * sc, y - 36 * sc, 1.8 * sc);
+    stroke(red, 2.6 * sc); L(x + 25 * sc, y - 18 * sc, x + 32 * sc, y - 12 * sc + Math.sin(e.t * 2) * 2 * sc);
+    if (night > 0.4) glow(x + 20 * sc, y - 14 * sc, 34 * sc, AMBER, 0.18 * night);
+  }
   function crescent() {
     const x = e.W * 0.8, y = e.H * 0.12, r = 16, a = 0.55 + 0.45 * e.dark, col = H2('#FFE9B0'); glow(x, y, r * 3, H2('#FFE2A8'), 0.25 * a);
     c.fillStyle = rgba(col, a); c.save(); c.beginPath(); c.arc(x, y, r, 0, 7); c.clip(); c.beginPath(); c.arc(x, y, r, 0, 7); c.moveTo(x + r * 1.3, y - r * 0.15); c.arc(x + r * 0.45, y - r * 0.15, r * 0.85, 0, 7); c.fill('evenodd'); c.restore(); star(x + r * 1.1, y - r * 0.2, 5, 2);
@@ -638,7 +680,7 @@ const Festive = (() => {
       c = ctx; e = env;
       for (const f of fx || []) {
         const i = f.indexOf(':'), name = i < 0 ? f : f.slice(0, i), arg = i < 0 ? '' : f.slice(i + 1), cols = arg.split(',').filter(s => /^#/.test(s.trim())).map(s => H2(s.trim()));
-        ({ lights: () => lights(cols), bunting: () => bunting(cols), fireworks: () => fireworks(cols), lanterns: () => lanterns(cols[0] || H2('#E23636')), poppies, sign: () => sign(arg), tree, sleigh, crescent, menorah: () => menorah(day || 0), diyas, pumpkins, bats, eggs, holotree, holopoppy, drones: () => drones(arg ? arg.split(',') : ['star']) }[name] || (() => {}))();
+        ({ lights: () => lights(cols), bunting: () => bunting(cols), fireworks: () => fireworks(cols), lanterns: () => lanterns(cols[0] || H2('#E23636')), poppies, sign: () => sign(arg), tree, sleigh, santa, flurry, crescent, menorah: () => menorah(day || 0), diyas, pumpkins, bats, eggs, holotree, holopoppy, drones: () => drones(arg ? arg.split(',') : ['star']) }[name] || (() => {}))();
       }
     },
   };

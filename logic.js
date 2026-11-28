@@ -716,7 +716,7 @@ const Occasions = {
       if (o.states && (!st || !o.states.includes(st))) continue;
       for (const y of [Y, Y - 1]) { const s0 = this.start(o.rule, y); if (s0 == null) continue; const k = Math.round((t - s0) / 86400000); if (k >= 0 && k < (o.span || 1)) { out.push({ ...o, day: k }); break; } }
     }
-    if (out.length > 1) { const loud = out.filter(o => !o.quiet); return loud.length ? loud : out; }
+    return out.filter(q => !q.quiet || !out.some(o => !o.quiet && o.cat === q.cat));
     return out;
   },
   today(dateKey) {
