@@ -192,9 +192,10 @@ const BriefFresh = {
     const angles = ["a starship captain's log", 'a nature documentary', 'a film-noir monologue', 'a breaking-news bulletin', 'a heist briefing', 'a sports pre-game show', 'a mission control go/no-go poll', 'a weary tour guide', 'a royal proclamation', 'a late-night radio host', 'a war-room situation report', 'a cooking show', 'a museum audio guide', "a weather god's performance review"];
     const angle = angles[Math.abs(Math.floor(T(date + 'T00:00') / DAY) * 5) % angles.length];
     const facts = Briefing.aiFacts(w, city), k = 'brief_' + SkyPrefs.persona + '_' + date + '_' + [...(angle + facts)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0);
-    const c = Store.get(k, null); if (c) return c;
     const dayK = 'briefDay_' + SkyPrefs.persona + '_' + date + '_' + String(city).trim().toLowerCase();   // per place: never show another location's briefing
     const day = Store.get(dayK, null);
+    if (day) return day;   // one briefing per day, place and persona: once written it stays put
+    const c = Store.get(k, null); if (c) return c;
     if (this.busy || (!VoiceKeys.gemini && !self.LanguageModel)) return day;
     this.busy = true;
     const recent = (Store.get('recentBrief', []) || []).slice(-4);
