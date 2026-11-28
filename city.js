@@ -545,7 +545,10 @@ const Festive = (() => {
   function santa() {
     if (e.storm > 0.3 || e.rain > 0.5) return; const period = 30, ph = (e.t % period) / period; if (ph > 0.6) return;
     const sc = Math.max(1.1, Math.min(1.9, Math.min(e.W, e.H) / 320)), span = e.W + 260 * sc, x = -170 * sc + span * (ph / 0.6), y = e.H * 0.16 + Math.sin(e.t * 0.9) * 7 * sc;
-    const night = e.dark, NV = H2('#0A0E16'), sh = h => rgba(lerp(H2(h), NV, night * 0.3));
+    drawSanta(x, y, sc, e.dark);
+  }
+  function drawSanta(x, y, sc, night) {
+    const NV = H2('#0A0E16'), sh = h => rgba(lerp(H2(h), NV, night * 0.3));
     const red = sh('#D42A2A'), white = sh('#F4F4F4'), gold = sh('#FFC83D'), brown = sh('#7A4A2A'), dark = sh('#2A1A10'), skin = sh('#F0C8A0'), antler = sh('#C9A26A');
     const L = (x0, y0, x1, y1) => { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
     const R = (x0, y0, x1, y1) => c.fillRect(x0, y0, x1 - x0, y1 - y0);
@@ -676,6 +679,12 @@ const Festive = (() => {
       glow(x, y, 7, col, 0.55 * vis); c.fillStyle = rgba(lerp(col, WHITE, 0.5), 0.9 * vis); c.beginPath(); c.arc(x, y, 1.4, 0, 7); c.fill(); }
   }
   return {
+    /** App-wide overlay: Santa crosses the top of every page every ~45 s, full colour. */
+    overlay(ctx, W, H, t, top) {
+      c = ctx; e = { t }; const period = 45, ph = (t % period) / period; if (ph > 0.42) return;
+      const sc = Math.max(1, Math.min(1.7, Math.min(W, H) / 330)), span = W + 300 * sc, x = -170 * sc + span * (ph / 0.42);
+      drawSanta(x, top + 40 * sc + Math.sin(t * 0.9) * 6 * sc - (x / W) * 18 * sc, sc, 0);
+    },
     draw(ctx, fx, day, env) {
       c = ctx; e = env;
       for (const f of fx || []) {

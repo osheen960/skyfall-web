@@ -728,7 +728,7 @@ function applyTheme() {
   Scene.set({ tempC: w.current.temperature, label: Codes.label(code).toUpperCase(), sky: Codes.sky(code), intensity, minute: minute + n.getUTCSeconds() / 60, rise, set, wind: hr ? hr.wind : w.current.windSpeed, windFrom: hr ? hr.dir : w.current.windDirection,
     cloudCover: w.current.cloudCover || 0, moon: moonPhase(Date.now()), southern: w.lat < 0 });
   if (S.place) Occasions.state = Occasions.stateOf(S.place.lat, S.place.lon);
-  const occ = Occasions.today(dkey(w.current.time)); Scene.set({ fx: occ.flatMap(o => o.fx || []), fxDay: occ.length ? occ[0].day : 0 });
+  const occ = Occasions.today(dkey(w.current.time)); Scene.set({ fx: occ.flatMap(o => o.fx || []).filter(f => f !== 'santa'), fxDay: occ.length ? occ[0].day : 0 });
   $('#ambTemp').textContent = deg(w.current.temperature);
   $('#ambSky').textContent = Codes.label(w.current.code).toUpperCase() + '';
   $('#ambClock').textContent = n.toISOString().slice(11, 16) + ' · ' + (S.place ? S.place.name.toUpperCase() : '');
@@ -982,7 +982,7 @@ $('#settings').addEventListener('click', e => {
   const tp = t.closest('[data-tabpref]'); if (tp) { const id = tp.dataset.tabpref; if (id === 'ACT' && !Prefs.activities.length) return; Prefs.hiddenTabs = Prefs.hiddenTabs.includes(id) ? Prefs.hiddenTabs.filter(x => x !== id) : [...Prefs.hiddenTabs, id]; return prefsChanged(); }
   const cp = t.closest('[data-corepref]'); if (cp) { const id = cp.dataset.corepref; Prefs.hiddenCore = Prefs.hiddenCore.includes(id) ? Prefs.hiddenCore.filter(x => x !== id) : [...Prefs.hiddenCore, id]; return prefsChanged(); }
   const fx = t.closest('[data-fx]'); if (fx) { Prefs[fx.dataset.fx] = !Prefs[fx.dataset.fx]; if ((fx.dataset.fx === 'alertsOn' || fx.dataset.fx === 'briefingOn') && Prefs[fx.dataset.fx]) askNotify(); return prefsChanged(); }
-  const oc = t.closest('[data-occ]'); if (oc) { Occasions.preview = oc.dataset.occ; return prefsChanged(); }
+  const oc = t.closest('[data-occ]'); if (oc) { Occasions.preview = oc.dataset.occ; window.SkySanta && SkySanta.check(); return prefsChanged(); }
   const sm = t.closest('[data-smart]'); if (sm) { Store.set('smartOn', !Store.get('smartOn', true)); if (Store.get('smartOn', true)) askNotify(); return renderSettings(); }
   if (t.closest('#cmClear')) { Smart.Commutes.set(null); workW = null; consFor = ''; renderSettings(); return renderCore(); }
   if (t.closest('#cmSave')) { const q = $('#cmWork').value.trim(), msg = $('#cmMsg'); if (!q) { msg.textContent = 'Type a suburb or place first.'; return; }
@@ -1166,3 +1166,23 @@ document.addEventListener('change', e => { if (e.target.id === 'kGemini') { Voic
 document.addEventListener('click', e => { if (e.target.closest('#dock [data-tab]')) setTimeout(() => { if (tabKey(S.tab) === 'NEWS') renderIntel(); }, 350); });
 boot();
 }
+
+/* Holiday cheer on every page: Santa flies across the top of the app when today's occasion has him. Touch-transparent. */
+(() => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true');
+  cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9000;display:none';
+  document.body.appendChild(cv);
+  const ctx = cv.getContext('2d'); let on = false, raf = 0; const t0 = performance.now();
+  const check = () => { try { on = Occasions.today().some(o => (o.fx || []).includes('santa')); } catch (_) { on = false; } cv.style.display = on ? 'block' : 'none'; if (on && !raf) raf = requestAnimationFrame(frame); };
+  function frame(now) {
+    raf = 0; if (!on || document.hidden) return;
+    const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    Festive.overlay(ctx, W, H, (now - t0) / 1000, 0);
+    raf = requestAnimationFrame(frame);
+  }
+  check(); setInterval(check, 60000); document.addEventListener('visibilitychange', check);
+  window.SkySanta = { check };
+})();
