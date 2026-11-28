@@ -2,6 +2,8 @@
 'use strict';
 {
 const $ = s => document.querySelector(s);
+/* Anti-clickjacking: GitHub Pages can't send frame-ancestors headers, so refuse to render inside someone else's frame. */
+if (window.top !== window.self) { document.documentElement.classList.add('framed'); try { window.top.location = window.self.location; } catch { } }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* User customisation (mirror of Android ui/Settings.kt Prefs). Defaults = the original app. */
